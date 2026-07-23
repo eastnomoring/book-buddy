@@ -1,0 +1,30 @@
+# 后端依赖（里程碑 1 最小集合）
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+# LLM & 多模态
+dashscope>=1.14.0  # 通义千问 SDK
+# openai>=1.0.0    # 备选：如果用 DeepSeek 兼容接口
+
+# 语音（待定，根据实际 API 调整）
+# 阿里云语音服务 SDK 或 HTTP 调用
+
+# RAG & 向量
+langchain>=0.1.0
+langchain-community>=0.0.20
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# PDF 解析
+marker-pdf>=1.0.0  # 数学公式友好
+# 或 nougat-ocr
+
+# MCP（后续）
+# mcp>=0.1.0
+
+# 开发工具
+pytest>=8.0.0
+httpx>=0.26.0  # 测试异步接口

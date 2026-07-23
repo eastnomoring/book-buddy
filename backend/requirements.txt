@@ -4,6 +4,7 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
 
 # LLM & 多模态
 dashscope>=1.14.0  # 通义千问 SDK
@@ -19,7 +20,7 @@ chromadb>=0.4.0
 sentence-transformers>=2.2.0
 
 # PDF 解析
-marker-pdf>=1.0.0  # 数学公式友好
+# marker-pdf>=1.0.0  # 数学公式友好，可选安装
 # 或 nougat-ocr
 
 # MCP（后续）

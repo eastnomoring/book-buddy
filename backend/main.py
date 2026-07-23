@@ -50,11 +50,12 @@ async def health():
         "rag": "ready",
     }
 
-# 注册路由（后续实现）
-# from app.routers import chat, voice, book
-# app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
-# app.include_router(voice.router, prefix="/api/voice", tags=["voice"])
-# app.include_router(book.router, prefix="/api/book", tags=["book"])
+# 注册路由
+from app.routers import chat, voice, book
+
+app.include_router(chat.router, prefix="/api", tags=["chat"])
+app.include_router(voice.router, prefix="/api", tags=["voice"])
+app.include_router(book.router, tags=["books"])
 
 
 if __name__ == "__main__":

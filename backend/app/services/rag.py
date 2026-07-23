@@ -1,6 +1,6 @@
 """RAG 服务：书籍解析 + 向量检索"""
-import os
 import hashlib
+import re
 from typing import List, Optional, Dict
 from pathlib import Path
 
@@ -8,92 +8,181 @@ from app.config import settings
 
 
 class BookParser:
-    """书籍解析器"""
-    
+    """书籍解析器：按页提取文本并按 chunk_size 分块"""
+
     def parse_pdf(self, file_path: str) -> List[Dict]:
         """
         解析 PDF 文件，返回分块列表
-        
+
         Returns:
             [{"content": "...", "page": 1, "chapter": "..."}, ...]
         """
-        # TODO: 使用 marker 或 nougat 解析
-        # 当前返回占位实现
-        
-        if not os.path.exists(file_path):
+        path = Path(file_path)
+        if not path.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
-        
-        # 占位：实际需要用 marker 库解析
-        # from marker.converters.pdf import PdfConverter
-        # from marker.models import load_all_models
-        
-        return [
-            {
-                "content": f"这是第 {i} 页的示例内容，实际需要用 marker 解析 PDF。",
-                "page": i,
-                "chapter": f"第 {i // 10 + 1} 章",
-            }
-            for i in range(1, 11)
+
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as e:
+            raise RuntimeError(
+                "缺少 PyMuPDF 依赖，请执行: pip install pymupdf"
+            ) from e
+
+        doc = fitz.open(file_path)
+        chunks: List[Dict] = []
+        chunk_size = settings.chunk_size
+        chunk_overlap = min(settings.chunk_overlap, max(chunk_size - 1, 0))
+
+        try:
+            current_chapter = "正文"
+            for page_index in range(len(doc)):
+                page = doc[page_index]
+                page_number = page_index + 1
+                text = page.get_text("text") or ""
+                text = self._normalize_text(text)
+                if not text:
+                    continue
+
+                chapter = self._detect_chapter(text) or current_chapter
+                current_chapter = chapter
+
+                for piece in self._split_text(text, chunk_size, chunk_overlap):
+                    chunks.append({
+                        "content": piece,
+                        "page": page_number,
+                        "chapter": chapter,
+                    })
+        finally:
+            doc.close()
+
+        if not chunks:
+            raise ValueError("PDF 未能提取到可用文本（可能是扫描版，需 OCR）")
+
+        return chunks
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        text = text.replace("\x00", " ")
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    @staticmethod
+    def _detect_chapter(text: str) -> Optional[str]:
+        patterns = [
+            r"^(第\s*[零一二三四五六七八九十百千\d]+\s*[章节回部])",
+            r"^(Chapter\s+\d+)\b",
+            r"^(CHAPTER\s+\d+)\b",
         ]
+        head = text[:200]
+        for pattern in patterns:
+            match = re.search(pattern, head, re.MULTILINE | re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        return None
+
+    @staticmethod
+    def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
+        if len(text) <= chunk_size:
+            return [text]
+
+        pieces: List[str] = []
+        start = 0
+        length = len(text)
+        while start < length:
+            end = min(start + chunk_size, length)
+            # 尽量在段落/句号处断开
+            if end < length:
+                window = text[start:end]
+                break_at = max(
+                    window.rfind("\n\n"),
+                    window.rfind("。"),
+                    window.rfind(". "),
+                    window.rfind("\n"),
+                )
+                if break_at >= chunk_size // 3:
+                    end = start + break_at + 1
+
+            piece = text[start:end].strip()
+            if piece:
+                pieces.append(piece)
+
+            if end >= length:
+                break
+            start = max(end - overlap, start + 1)
+
+        return pieces
 
 
 class VectorStore:
     """向量存储"""
-    
+
     def __init__(self, persist_dir: str = None):
         self.persist_dir = persist_dir or settings.vector_db_path
         self.collection = None
         self._initialized = False
-    
+
     def _ensure_initialized(self):
         """确保向量库已初始化"""
         if self._initialized:
             return
-        
+
         try:
             import chromadb
             from chromadb.config import Settings as ChromaSettings
-            
+
             client = chromadb.PersistentClient(
                 path=self.persist_dir,
-                settings=ChromaSettings(anonymized_telemetry=False)
+                settings=ChromaSettings(anonymized_telemetry=False),
             )
             self.collection = client.get_or_create_collection(
                 name="book_chunks",
-                metadata={"hnsw:space": "cosine"}
+                metadata={"hnsw:space": "cosine"},
             )
             self._initialized = True
-            
+
         except Exception as e:
-            raise RuntimeError(f"初始化向量库失败: {str(e)}")
-    
+            raise RuntimeError(f"初始化向量库失败: {str(e)}") from e
+
     def add_chunks(self, chunks: List[Dict], book_id: str):
-        """添加文档块到向量库"""
+        """添加文档块到向量库（先清理同书旧数据）"""
         self._ensure_initialized()
-        
+        self.delete_book(book_id)
+
         ids = [
-            f"{book_id}_{hashlib.md5(chunk['content'].encode()).hexdigest()[:12]}"
-            for chunk in chunks
+            f"{book_id}_{hashlib.md5(chunk['content'].encode('utf-8')).hexdigest()[:12]}_{i}"
+            for i, chunk in enumerate(chunks)
         ]
-        
+
         metadatas = [
             {
                 "book_id": book_id,
-                "page": chunk.get("page", 0),
-                "chapter": chunk.get("chapter", ""),
+                "page": int(chunk.get("page", 0) or 0),
+                "chapter": str(chunk.get("chapter") or ""),
             }
             for chunk in chunks
         ]
-        
+
         documents = [chunk["content"] for chunk in chunks]
-        
-        # 生成嵌入（使用 Chroma 内置的 embedding 函数）
-        self.collection.add(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas,
-        )
-    
+
+        # Chroma 对单次 add 有大小限制，分批写入
+        batch_size = 100
+        for i in range(0, len(documents), batch_size):
+            self.collection.add(
+                ids=ids[i:i + batch_size],
+                documents=documents[i:i + batch_size],
+                metadatas=metadatas[i:i + batch_size],
+            )
+
+    def delete_book(self, book_id: str) -> None:
+        """删除某本书的全部向量数据"""
+        self._ensure_initialized()
+        try:
+            self.collection.delete(where={"book_id": book_id})
+        except Exception:
+            # 集合为空或不存在匹配项时忽略
+            pass
+
     def search(
         self,
         query: str,
@@ -102,77 +191,85 @@ class VectorStore:
     ) -> List[Dict]:
         """检索相关文档块"""
         self._ensure_initialized()
-        
-        where_filter = None
-        if book_id:
-            where_filter = {"book_id": book_id}
-        
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_filter,
-        )
-        
-        # 格式化结果
+
+        if self.collection.count() == 0:
+            return []
+
+        where_filter = {"book_id": book_id} if book_id else None
+
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=min(top_k, max(self.collection.count(), 1)),
+                where=where_filter,
+            )
+        except Exception as e:
+            print(f"向量检索失败: {e}")
+            return []
+
+        documents = (results.get("documents") or [[]])[0]
+        metadatas = (results.get("metadatas") or [[]])[0]
+        distances = (results.get("distances") or [[]])[0]
+
         chunks = []
-        for i, doc in enumerate(results["documents"][0]):
+        for i, doc in enumerate(documents):
+            meta = metadatas[i] if i < len(metadatas) else {}
+            distance = distances[i] if i < len(distances) else 1.0
             chunks.append({
                 "content": doc,
-                "page": results["metadatas"][0][i].get("page", 0),
-                "chapter": results["metadatas"][0][i].get("chapter", ""),
-                "score": 1 - results["distances"][0][i],  # 转换为相似度
+                "page": meta.get("page", 0),
+                "chapter": meta.get("chapter", ""),
+                "score": 1 - distance,
             })
-        
+
         return chunks
 
 
 class RAGService:
     """RAG 服务：整合解析和检索"""
-    
+
     def __init__(self):
         self.parser = BookParser()
         self.vector_store = VectorStore()
-    
+
     def ingest_book(self, file_path: str, book_id: str) -> Dict:
         """
         导入书籍到向量库
-        
+
         Returns:
             {"total_chunks": 100, "pages": 200}
         """
-        # 解析 PDF
         chunks = self.parser.parse_pdf(file_path)
-        
-        # 添加到向量库
         self.vector_store.add_chunks(chunks, book_id)
-        
+
         return {
             "total_chunks": len(chunks),
             "pages": max(c["page"] for c in chunks) if chunks else 0,
         }
-    
+
     def retrieve_context(
         self,
         query: str,
         book_id: Optional[str] = None,
         top_k: int = 5,
     ) -> str:
-        """
-        检索相关上下文，返回拼接后的文本
-        """
+        """检索相关上下文，返回拼接后的文本"""
         chunks = self.vector_store.search(query, book_id, top_k)
-        
+
         if not chunks:
             return ""
-        
+
         context_parts = []
         for chunk in chunks:
-            context_parts.append(
-                f"[第 {chunk['page']} 页]\n{chunk['content']}"
-            )
-        
+            chapter = chunk.get("chapter") or ""
+            header = f"[第 {chunk['page']} 页"
+            if chapter:
+                header += f" / {chapter}"
+            header += "]"
+            context_parts.append(f"{header}\n{chunk['content']}")
+
         return "\n\n".join(context_parts)
-    
+
     def get_sources(
         self,
         query: str,
@@ -181,6 +278,10 @@ class RAGService:
     ) -> List[Dict]:
         """获取引用来源（用于显示）"""
         return self.vector_store.search(query, book_id, top_k)
+
+    def delete_book(self, book_id: str) -> None:
+        """删除书籍向量数据"""
+        self.vector_store.delete_book(book_id)
 
 
 # 全局实例

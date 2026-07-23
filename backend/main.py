@@ -27,10 +27,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from app.config import settings
+
 # CORS 配置（开发环境）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +57,7 @@ from app.routers import chat, voice, book
 
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(voice.router, prefix="/api", tags=["voice"])
-app.include_router(book.router, tags=["books"])
+app.include_router(book.router, prefix="/api", tags=["books"])
 
 
 if __name__ == "__main__":

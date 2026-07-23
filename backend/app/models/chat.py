@@ -31,12 +31,6 @@ class ChatResponse(BaseModel):
     page_references: List[int] = Field(default_factory=list, description="引用的页码")
 
 
-class ChatStreamChunk(BaseModel):
-    """流式响应片段"""
-    delta: str = Field(..., description="增量文本")
-    done: bool = Field(default=False, description="是否结束")
-
-
 # ============ Book 模型 ============
 
 class BookInfo(BaseModel):
@@ -47,12 +41,6 @@ class BookInfo(BaseModel):
     total_pages: int = Field(..., description="总页数")
     chapters: List[dict] = Field(default_factory=list, description="章节列表")
     created_at: datetime = Field(default_factory=datetime.now)
-
-
-class BookUploadRequest(BaseModel):
-    """书籍上传请求"""
-    title: str
-    author: Optional[str] = None
 
 
 class BookUploadResponse(BaseModel):

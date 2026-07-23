@@ -36,9 +36,40 @@ export interface BookInfo {
   chapters: Array<{ title: string; startPage: number }>
 }
 
+export interface BookUploadResult {
+  id: string
+  title: string
+  message: string
+}
+
 export interface VoiceTranscribeResponse {
   text: string
   duration: number
+}
+
+function mapBookInfo(raw: Record<string, unknown>): BookInfo {
+  const chaptersRaw = (raw.chapters as Array<Record<string, unknown>>) || []
+  return {
+    id: String(raw.id ?? ''),
+    title: String(raw.title ?? ''),
+    author: raw.author ? String(raw.author) : undefined,
+    totalPages: Number(raw.total_pages ?? raw.totalPages ?? 0),
+    chapters: chaptersRaw.map((c) => ({
+      title: String(c.title ?? ''),
+      startPage: Number(c.start_page ?? c.startPage ?? 0),
+    })),
+  }
+}
+
+function mapChatResponse(raw: Record<string, unknown>): ChatResponse {
+  return {
+    text: String(raw.text ?? ''),
+    audio: raw.audio ? String(raw.audio) : undefined,
+    sources: (raw.sources as string[]) || [],
+    pageReferences: (raw.page_references as number[])
+      || (raw.pageReferences as number[])
+      || [],
+  }
 }
 
 // 对话
@@ -51,7 +82,7 @@ export async function sendChat(request: ChatRequest): Promise<ChatResponse> {
     page_number: request.pageNumber,
     history: request.history,
   })
-  return response.data
+  return mapChatResponse(response.data)
 }
 
 // 流式对话
@@ -85,24 +116,28 @@ export async function* streamChat(request: ChatRequest): AsyncGenerator<string> 
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-    
-    // 解析 SSE 格式
+
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          if (data.delta) {
-            yield data.delta
-          }
-          if (data.done) {
-            return
-          }
-        } catch {
-          // 忽略解析错误
-        }
+      if (!line.startsWith('data: ')) continue
+
+      let data: { delta?: string; done?: boolean; error?: string }
+      try {
+        data = JSON.parse(line.slice(6))
+      } catch {
+        continue
+      }
+
+      if (data.error) {
+        throw new Error(String(data.error))
+      }
+      if (data.delta) {
+        yield data.delta
+      }
+      if (data.done) {
+        return
       }
     }
   }
@@ -111,26 +146,30 @@ export async function* streamChat(request: ChatRequest): AsyncGenerator<string> 
 // 书籍
 export async function listBooks(): Promise<BookInfo[]> {
   const response = await api.get('/books')
-  return response.data
+  return (response.data as Record<string, unknown>[]).map(mapBookInfo)
 }
 
-export async function uploadBook(file: File, title?: string): Promise<BookInfo> {
+export async function uploadBook(file: File, title?: string): Promise<BookUploadResult> {
   const formData = new FormData()
   formData.append('file', file)
   if (title) {
     formData.append('title', title)
   }
-  
-  const response = await api.post('/books/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
-  return response.data
+
+  const response = await api.post('/books/upload', formData)
+  const raw = response.data as Record<string, unknown>
+  return {
+    id: String(raw.id ?? ''),
+    title: String(raw.title ?? ''),
+    message: String(raw.message ?? ''),
+  }
 }
 
 // 语音
-export async function transcribeVoice(audioBase64: string, format: string = 'webm'): Promise<VoiceTranscribeResponse> {
+export async function transcribeVoice(
+  audioBase64: string,
+  format: string = 'webm',
+): Promise<VoiceTranscribeResponse> {
   const response = await api.post('/voice/transcribe', {
     audio: audioBase64,
     format,

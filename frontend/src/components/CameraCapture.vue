@@ -7,6 +7,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   capture: [imageBase64: string]
+  clear: []
   pageChange: [page: number]
 }>()
 
@@ -24,13 +25,13 @@ async function startCamera() {
     error.value = null
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: 'environment', // 后置摄像头（适合拍书）
+        facingMode: 'environment',
         width: { ideal: 1920 },
         height: { ideal: 1080 },
       },
       audio: false,
     })
-    
+
     if (videoRef.value) {
       videoRef.value.srcObject = stream
       isStreaming.value = true
@@ -57,28 +58,26 @@ function capturePhoto() {
 
   const video = videoRef.value
   const canvas = canvasRef.value
-  
+
   canvas.width = video.videoWidth
   canvas.height = video.videoHeight
-  
+
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  
+
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-  
-  // 转为 base64（去掉前缀）
+
   const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
   const base64 = dataUrl.split(',')[1]
-  
+
   capturedPreview.value = dataUrl
   emit('capture', base64)
-  
-  // 停止摄像头
   stopCamera()
 }
 
 function clearCapture() {
   capturedPreview.value = null
+  emit('clear')
 }
 
 function updatePage() {
@@ -94,154 +93,204 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="camera-capture card">
-    <div class="capture-header">
-      <h3>📷 拍照</h3>
-      <span v-if="pageInput" class="page-indicator">
-        第 {{ pageInput }} 页
-      </span>
+  <div class="capture">
+    <div class="capture-top">
+      <div>
+        <h2 class="pane-title">书页</h2>
+        <p class="pane-sub">对准当前页，拍下后即可提问</p>
+      </div>
+      <label class="page-field">
+        <span>页码</span>
+        <input
+          type="number"
+          v-model.number="pageInput"
+          @change="updatePage"
+          min="1"
+        />
+      </label>
     </div>
 
-    <div class="page-input-area">
-      <label>当前页码：</label>
-      <input 
-        type="number" 
-        v-model.number="pageInput"
-        @change="updatePage"
-        min="1"
-        class="page-input"
-      />
-    </div>
+    <div v-if="error" class="error-banner">{{ error }}</div>
 
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
-
-    <div class="video-container">
-      <video 
+    <div class="viewport" :class="{ live: isStreaming, snapped: !!capturedPreview }">
+      <video
         v-show="isStreaming && !capturedPreview"
         ref="videoRef"
         autoplay
         playsinline
         muted
-        class="video"
+        class="feed"
       ></video>
 
-      <img 
-        v-if="capturedPreview" 
-        :src="capturedPreview" 
-        class="preview-image"
-        alt="捕获的图像"
+      <img
+        v-if="capturedPreview"
+        :src="capturedPreview"
+        class="feed"
+        alt="已拍摄书页"
       />
 
-      <div v-if="!isStreaming && !capturedPreview" class="placeholder">
-        <div class="placeholder-icon">📷</div>
-        <p>点击下方按钮开启摄像头</p>
+      <div v-if="!isStreaming && !capturedPreview" class="idle">
+        <span class="idle-mark" aria-hidden="true"></span>
+        <p>开启摄像头拍摄纸质书页</p>
       </div>
+
+      <div v-if="isStreaming && !capturedPreview" class="live-tag">取景中</div>
     </div>
 
-    <canvas ref="canvasRef" style="display: none;"></canvas>
+    <canvas ref="canvasRef" hidden></canvas>
 
-    <div class="controls">
+    <div class="actions">
       <template v-if="!isStreaming && !capturedPreview">
-        <button @click="startCamera" class="btn btn-primary">
-          开启摄像头
-        </button>
+        <button @click="startCamera" class="btn btn-primary">开启摄像头</button>
       </template>
 
       <template v-else-if="isStreaming && !capturedPreview">
-        <button @click="capturePhoto" class="btn btn-primary">
-          📸 拍照
-        </button>
-        <button @click="stopCamera" class="btn">
-          取消
-        </button>
+        <button @click="capturePhoto" class="btn btn-primary">拍摄</button>
+        <button @click="stopCamera" class="btn btn-ghost">取消</button>
       </template>
 
       <template v-else-if="capturedPreview">
-        <button @click="clearCapture" class="btn">
-          重新拍摄
-        </button>
+        <button @click="clearCapture" class="btn btn-ghost">重新拍摄</button>
       </template>
     </div>
   </div>
 </template>
 
 <style scoped>
-.camera-capture {
+.capture {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  height: 100%;
+  padding: 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft);
 }
 
-.capture-header {
+.capture-top {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
+  gap: 0.75rem;
 }
 
-.capture-header h3 {
-  margin: 0;
-  font-size: 1rem;
+.pane-title {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  line-height: 1.1;
 }
 
-.page-indicator {
-  font-size: 0.875rem;
-  color: var(--primary);
-  font-weight: 500;
+.pane-sub {
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
-.page-input-area {
+.page-field {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
 
-.page-input {
-  width: 80px;
-  padding: 0.5rem;
+.page-field input {
+  width: 4.5rem;
+  padding: 0.45rem 0.55rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
 }
 
-.video-container {
+.viewport {
   position: relative;
-  aspect-ratio: 3/4;
-  background: #1a1a1a;
-  border-radius: 8px;
+  flex: 1;
+  min-height: 320px;
+  aspect-ratio: 3 / 4;
+  border-radius: calc(var(--radius) - 4px);
   overflow: hidden;
+  background:
+    linear-gradient(160deg, #1c2430 0%, #2a3540 100%);
 }
 
-.video,
-.preview-image {
+.viewport.live {
+  outline: 1px solid rgba(26, 107, 92, 0.45);
+  outline-offset: -1px;
+}
+
+.viewport.snapped {
+  outline: 1px solid rgba(26, 107, 92, 0.35);
+  outline-offset: -1px;
+}
+
+.feed {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+  animation: fade-in 0.35s var(--ease);
 }
 
-.placeholder {
-  width: 100%;
+.idle {
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #666;
+  gap: 0.85rem;
+  color: rgba(247, 249, 250, 0.72);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1.5rem;
 }
 
-.placeholder-icon {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
+.idle-mark {
+  width: 42px;
+  height: 42px;
+  border: 1.5px solid rgba(247, 249, 250, 0.35);
+  border-radius: 50% 50% 40% 60%;
+  position: relative;
 }
 
-.controls {
+.idle-mark::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1.5px solid rgba(247, 249, 250, 0.55);
+  border-radius: 40% 60% 50% 50%;
+}
+
+.live-tag {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e8fff8;
+  background: rgba(26, 107, 92, 0.85);
+  border-radius: 4px;
+  animation: pulse-soft 1.8s ease-in-out infinite;
+}
+
+.actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
-.error-message {
-  padding: 0.75rem;
-  background: #fee;
+.error-banner {
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--error-soft);
   color: var(--error);
-  border-radius: 6px;
-  font-size: 0.875rem;
+  font-size: 0.86rem;
 }
 </style>

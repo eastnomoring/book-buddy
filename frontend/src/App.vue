@@ -23,34 +23,32 @@ function onImageCaptured(imageBase64: string) {
 
 <template>
   <div class="app">
-    <header class="header">
-      <div class="container header-content">
-        <h1 class="logo">
-          <span class="logo-icon">📚</span>
-          Book Buddy
-        </h1>
-        <BookSelector @select="onBookSelected" />
+    <header class="masthead">
+      <div class="brand-block">
+        <p class="brand-mark">Book Buddy</p>
+        <p class="brand-line">读硬书时的 AI 伴读</p>
       </div>
+      <BookSelector @select="onBookSelected" />
     </header>
 
-    <main class="main container">
-      <div class="workspace">
-        <aside class="sidebar">
-          <CameraCapture 
-            @capture="onImageCaptured"
-            :currentPage="currentPage"
-            @pageChange="onPageChange"
-          />
-        </aside>
+    <main class="stage">
+      <aside class="capture-pane">
+        <CameraCapture
+          @capture="onImageCaptured"
+          @clear="capturedImage = null"
+          :currentPage="currentPage"
+          @pageChange="onPageChange"
+        />
+      </aside>
 
-        <section class="chat-area">
-          <ChatInterface 
-            :bookId="currentBookId"
-            :image="capturedImage"
-            @clearImage="capturedImage = null"
-          />
-        </section>
-      </div>
+      <section class="dialogue-pane">
+        <ChatInterface
+          :bookId="currentBookId"
+          :image="capturedImage"
+          :pageNumber="currentPage"
+          @clearImage="capturedImage = null"
+        />
+      </section>
     </main>
   </div>
 </template>
@@ -60,67 +58,68 @@ function onImageCaptured(imageBase64: string) {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2rem;
+  animation: fade-in 0.6s var(--ease);
 }
 
-.header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 1rem 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
+.masthead {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1rem;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.logo-icon {
-  font-size: 1.75rem;
-}
-
-.main {
-  flex: 1;
-  padding: 2rem 1rem;
-}
-
-.workspace {
-  display: grid;
-  grid-template-columns: 320px 1fr;
   gap: 1.5rem;
-  min-height: calc(100vh - 200px);
+  padding-bottom: 1.35rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.5rem;
+  animation: rise-in 0.7s var(--ease);
 }
 
-.sidebar {
+.brand-block {
+  min-width: 0;
+}
+
+.brand-mark {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 4.5vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.brand-line {
+  margin-top: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 1.25rem;
+  min-height: calc(100vh - 180px);
+  animation: rise-in 0.85s var(--ease) 0.08s both;
+}
+
+.capture-pane,
+.dialogue-pane {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
 }
 
-.chat-area {
-  display: flex;
-  flex-direction: column;
-}
-
-@media (max-width: 768px) {
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-  
-  .header-content {
+@media (max-width: 900px) {
+  .masthead {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .stage {
+    grid-template-columns: 1fr;
+    min-height: auto;
   }
 }
 </style>

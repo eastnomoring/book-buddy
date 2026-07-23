@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { listBooks, uploadBook, type BookInfo } from '../api/client'
 
 const books = ref<BookInfo[]>([])
@@ -7,6 +7,8 @@ const selectedBook = ref<string | null>(null)
 const loading = ref(false)
 const uploading = ref(false)
 const error = ref<string | null>(null)
+const open = ref(false)
+const rootEl = ref<HTMLElement | null>(null)
 
 const emit = defineEmits<{
   select: [bookId: string]
@@ -32,11 +34,20 @@ async function handleUpload(event: Event) {
 
   uploading.value = true
   error.value = null
-  
+
   try {
-    await uploadBook(file, file.name.replace('.pdf', ''))
+    await uploadBook(file, file.name.replace(/\.pdf$/i, ''))
     await loadBooks()
-    input.value = '' // 清空 input
+    input.value = ''
+    open.value = true
+    const timer = window.setInterval(async () => {
+      await loadBooks()
+      const stillParsing = books.value.some((b) => b.totalPages === 0)
+      if (!stillParsing) {
+        window.clearInterval(timer)
+      }
+    }, 1500)
+    window.setTimeout(() => window.clearInterval(timer), 30000)
   } catch (e) {
     error.value = '上传失败'
     console.error(e)
@@ -48,156 +59,209 @@ async function handleUpload(event: Event) {
 function selectBook(bookId: string) {
   selectedBook.value = bookId
   emit('select', bookId)
+  open.value = false
 }
 
-onMounted(loadBooks)
+function selectedTitle() {
+  const book = books.value.find((b) => b.id === selectedBook.value)
+  return book?.title || '选择书籍'
+}
+
+function onDocClick(e: MouseEvent) {
+  if (!rootEl.value) return
+  if (!rootEl.value.contains(e.target as Node)) {
+    open.value = false
+  }
+}
+
+onMounted(() => {
+  loadBooks()
+  document.addEventListener('click', onDocClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick)
+})
 </script>
 
 <template>
-  <div class="book-selector">
-    <div class="selector-header">
-      <label class="select-label">当前书籍</label>
-      <div class="upload-area">
-        <label class="upload-btn" :class="{ disabled: uploading }">
-          {{ uploading ? '上传中...' : '上传新书' }}
-          <input 
-            type="file" 
-            accept=".pdf" 
-            @change="handleUpload"
-            :disabled="uploading"
-            hidden
-          />
-        </label>
+  <div class="book-bar" ref="rootEl">
+    <button class="picker" type="button" @click="open = !open" :aria-expanded="open">
+      <span class="picker-kicker">当前书籍</span>
+      <span class="picker-title">{{ selectedTitle() }}</span>
+    </button>
+
+    <label class="upload" :class="{ disabled: uploading }">
+      {{ uploading ? '上传中' : '上传 PDF' }}
+      <input
+        type="file"
+        accept=".pdf"
+        @change="handleUpload"
+        :disabled="uploading"
+        hidden
+      />
+    </label>
+
+    <div v-if="open" class="panel">
+      <div v-if="loading" class="panel-state">加载中…</div>
+      <div v-else-if="error" class="panel-state error">
+        {{ error }}
+        <button type="button" class="retry" @click="loadBooks">重试</button>
       </div>
-    </div>
-
-    <div v-if="loading" class="loading-state">
-      加载中...
-    </div>
-
-    <div v-else-if="error" class="error-state">
-      {{ error }}
-      <button @click="loadBooks" class="retry-btn">重试</button>
-    </div>
-
-    <div v-else-if="books.length === 0" class="empty-state">
-      <p>暂无书籍</p>
-      <p class="hint">上传一本 PDF 开始学习吧</p>
-    </div>
-
-    <div v-else class="book-list">
-      <button
-        v-for="book in books"
-        :key="book.id"
-        class="book-item"
-        :class="{ active: selectedBook === book.id }"
-        @click="selectBook(book.id)"
-      >
-        <span class="book-title">{{ book.title }}</span>
-        <span class="book-pages">{{ book.totalPages }} 页</span>
-      </button>
+      <div v-else-if="books.length === 0" class="panel-state">
+        还没有书。上传一本 PDF 开始。
+      </div>
+      <ul v-else class="list">
+        <li v-for="book in books" :key="book.id">
+          <button
+            type="button"
+            class="item"
+            :class="{ active: selectedBook === book.id }"
+            @click="selectBook(book.id)"
+          >
+            <span class="item-title">{{ book.title }}</span>
+            <span class="item-meta">
+              <template v-if="book.totalPages < 0">解析失败</template>
+              <template v-else-if="book.totalPages === 0">解析中</template>
+              <template v-else>{{ book.totalPages }} 页</template>
+            </span>
+          </button>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
 
 <style scoped>
-.book-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.selector-header {
+.book-bar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: min(420px, 100%);
 }
 
-.select-label {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+.picker {
+  flex: 1;
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.7);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
 }
 
-.upload-btn {
-  padding: 0.5rem 1rem;
-  background: var(--primary);
-  color: white;
-  border-radius: 6px;
-  font-size: 0.875rem;
+.picker:hover {
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.picker-kicker {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.picker-title {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upload {
+  flex-shrink: 0;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #f7fffc;
+  font-size: 0.88rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s var(--ease);
 }
 
-.upload-btn:hover:not(.disabled) {
-  background: var(--primary-light);
+.upload:hover:not(.disabled) {
+  background: var(--accent-deep);
 }
 
-.upload-btn.disabled {
-  opacity: 0.6;
+.upload.disabled {
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.book-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-soft);
+  animation: rise-in 0.25s var(--ease);
 }
 
-.book-item {
+.panel-state {
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.panel-state.error {
+  color: var(--error);
+}
+
+.retry {
+  display: inline-block;
+  margin-top: 0.45rem;
+  color: var(--accent-deep);
+  text-decoration: underline;
+}
+
+.list {
+  list-style: none;
+  padding: 0.35rem;
+}
+
+.item {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 6px;
   text-align: left;
+  transition: background 0.15s var(--ease);
 }
 
-.book-item:hover {
-  border-color: var(--primary);
+.item:hover {
+  background: var(--accent-soft);
 }
 
-.book-item.active {
-  border-color: var(--primary);
-  background: #f0f0ff;
+.item.active {
+  background: var(--accent-soft);
 }
 
-.book-title {
+.item-title {
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.book-pages {
+.item-meta {
+  flex-shrink: 0;
   font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.loading-state,
-.error-state,
-.empty-state {
-  padding: 1rem;
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.retry-btn {
-  margin-top: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.hint {
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
+  color: var(--muted);
 }
 </style>

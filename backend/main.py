@@ -48,7 +48,7 @@ async def health():
     """详细健康检查"""
     return {
         "status": "healthy",
-        "llm": "qwen-vl",  # TODO: 实际检查连接
+        "llm": f"{settings.llm_provider}:{settings.openai_model if settings.llm_provider == 'openai' else settings.llm_model}",
         "rag": "ready",
     }
 

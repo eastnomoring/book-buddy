@@ -12,12 +12,18 @@ class Settings(BaseSettings):
     deepseek_api_key: Optional[str] = None
     
     # LLM 配置
-    llm_provider: str = "qwen"  # qwen | deepseek
+    llm_provider: str = "qwen"  # qwen | deepseek | openai
     llm_model: str = "qwen-vl-max"  # 多模态模型
     llm_timeout: int = 60
+
+    # OpenAI 兼容接口（智谱 / 硅基流动 / Ollama 通用）
+    openai_api_key: Optional[str] = None
+    openai_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    openai_model: str = "glm-4v-flash"
     
     # RAG 配置
-    embedding_model: str = "text-embedding-v2"
+    embedding_provider: str = "openai"  # openai（云端 API，中文效果好）| local（Chroma 默认模型）
+    embedding_model: str = "embedding-3"
     vector_db_path: str = "./data/chroma"
     chunk_size: int = 500
     chunk_overlap: int = 50

@@ -8,7 +8,7 @@ pydantic-settings>=2.0.0
 
 # LLM & 多模态
 dashscope>=1.14.0  # 通义千问 SDK
-# openai>=1.0.0    # 备选：如果用 DeepSeek 兼容接口
+openai>=1.0.0  # OpenAI 兼容接口（智谱 GLM / 硅基流动 / Ollama 通用）
 
 # 语音（待定，根据实际 API 调整）
 # 阿里云语音服务 SDK 或 HTTP 调用

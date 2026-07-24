@@ -114,6 +114,53 @@ class BookParser:
         return pieces
 
 
+class APIEmbeddingFunction:
+    """通过 OpenAI 兼容接口调用云端嵌入模型（智谱 embedding-3 等）
+
+    实现 Chroma EmbeddingFunction 协议（__call__ / name / 配置方法）。
+    """
+
+    # 智谱 embedding-3 单次请求最多 64 条
+    BATCH_SIZE = 64
+
+    def __init__(self):
+        from openai import OpenAI
+
+        if not settings.openai_api_key:
+            raise ValueError("EMBEDDING_PROVIDER=openai 需要设置 OPENAI_API_KEY")
+        self._client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            timeout=settings.llm_timeout,
+        )
+        self._model = settings.embedding_model
+
+    def name(self) -> str:
+        return f"openai-compat-{self._model}"
+
+    def __call__(self, input: List[str]) -> List[List[float]]:
+        embeddings: List[List[float]] = []
+        texts = list(input)
+        for i in range(0, len(texts), self.BATCH_SIZE):
+            batch = texts[i:i + self.BATCH_SIZE]
+            resp = self._client.embeddings.create(model=self._model, input=batch)
+            embeddings.extend(item.embedding for item in resp.data)
+        return embeddings
+
+    def embed_documents(self, input: List[str]) -> List[List[float]]:
+        return self(input)
+
+    def embed_query(self, input: List[str]) -> List[List[float]]:
+        return self(input)
+
+    @staticmethod
+    def build_from_config(config: dict) -> "APIEmbeddingFunction":
+        return APIEmbeddingFunction()
+
+    def get_config(self) -> dict:
+        return {}
+
+
 class VectorStore:
     """向量存储"""
 
@@ -135,9 +182,15 @@ class VectorStore:
                 path=self.persist_dir,
                 settings=ChromaSettings(anonymized_telemetry=False),
             )
+            embedding_function = (
+                APIEmbeddingFunction()
+                if settings.embedding_provider == "openai"
+                else None  # None = Chroma 默认本地模型（英文为主）
+            )
             self.collection = client.get_or_create_collection(
                 name="book_chunks",
                 metadata={"hnsw:space": "cosine"},
+                embedding_function=embedding_function,
             )
             self._initialized = True
 

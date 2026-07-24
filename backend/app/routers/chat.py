@@ -1,4 +1,5 @@
 """对话路由"""
+import asyncio
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
@@ -80,11 +81,15 @@ async def chat(
     if not user_text and not request.image:
         raise HTTPException(status_code=400, detail="需要提供文本、图像或语音输入")
 
+    retrieval_text = user_text  # 检索用原始问题，不混入页码提示
+
     if request.page_number:
         page_hint = f"（用户当前在阅读第 {request.page_number} 页）"
         user_text = f"{page_hint}\n{user_text}" if user_text else page_hint
 
-    context, sources, page_refs = _retrieve_rag(rag, user_text, request.book_id)
+    context, sources, page_refs = await asyncio.to_thread(
+        _retrieve_rag, rag, retrieval_text, request.book_id
+    )
     system_prompt = _build_system_prompt(context, detailed=True)
 
     history = [
@@ -129,11 +134,15 @@ async def chat_stream(
     if not user_text and not request.image:
         raise HTTPException(status_code=400, detail="需要提供文本或图像输入")
 
+    retrieval_text = user_text  # 检索用原始问题，不混入页码提示
+
     if request.page_number:
         page_hint = f"（用户当前在阅读第 {request.page_number} 页）"
         user_text = f"{page_hint}\n{user_text}" if user_text else page_hint
 
-    context, _, _ = _retrieve_rag(rag, user_text, request.book_id)
+    context, _, _ = await asyncio.to_thread(
+        _retrieve_rag, rag, retrieval_text, request.book_id
+    )
     system_prompt = _build_system_prompt(context, detailed=False)
     full_prompt = f"{system_prompt}\n\n用户问题：{user_text or '请解释这张图片的内容'}"
 

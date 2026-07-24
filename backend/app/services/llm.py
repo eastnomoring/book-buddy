@@ -177,6 +177,96 @@ class DeepSeekService(LLMService):
         raise NotImplementedError("DeepSeek 服务待实现")
 
 
+class OpenAICompatibleService(LLMService):
+    """OpenAI 兼容接口服务（智谱 GLM / 硅基流动 / Ollama 通用）"""
+
+    def __init__(self):
+        self.api_key = settings.openai_api_key
+        self.base_url = settings.openai_base_url
+        self.model = settings.openai_model
+        self.timeout = settings.llm_timeout
+
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY 未设置")
+
+    def _build_messages(
+        self,
+        text: str,
+        image: Optional[str] = None,
+        history: Optional[List[dict]] = None,
+    ) -> List[dict]:
+        messages: List[dict] = []
+
+        if history:
+            for msg in history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                # 历史统一为纯文本，避免混入无法回放的多模态结构
+                if isinstance(content, list):
+                    content = extract_text_content(content)
+                messages.append({"role": role, "content": content})
+
+        if image:
+            messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image}"},
+                    },
+                    {"type": "text", "text": text},
+                ],
+            })
+        else:
+            messages.append({"role": "user", "content": text})
+
+        return messages
+
+    async def chat(
+        self,
+        text: str,
+        image: Optional[str] = None,
+        history: Optional[List[dict]] = None,
+        stream: bool = False,
+    ) -> Union[AsyncIterator[str], str]:
+        """多模态对话，接口语义与 QwenVLService.chat 一致"""
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=self.timeout,
+        )
+        messages = self._build_messages(text, image, history)
+
+        try:
+            if stream:
+                return self._stream_chat(client, messages)
+
+            response = await client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+            )
+            return response.choices[0].message.content or ""
+
+        except Exception as e:
+            raise Exception(f"调用 LLM 失败: {str(e)}") from e
+
+    async def _stream_chat(self, client, messages: List[dict]) -> AsyncIterator[str]:
+        """流式生成（OpenAI 返回增量 delta，直接透传）"""
+        stream = await client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            stream=True,
+        )
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+
 def get_llm_service() -> LLMService:
     """获取 LLM 服务实例"""
     provider = settings.llm_provider
@@ -185,4 +275,6 @@ def get_llm_service() -> LLMService:
         return QwenVLService()
     if provider == "deepseek":
         return DeepSeekService()
+    if provider == "openai":
+        return OpenAICompatibleService()
     raise ValueError(f"不支持的 LLM 提供商: {provider}")

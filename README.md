@@ -28,6 +28,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env，填入你的智谱 API Key（https://open.bigmodel.cn/ 创建）
 # 默认使用 GLM-4.6V（多模态）+ embedding-3（向量嵌入）
+# 也可以跳过本步，启动后在网页右上角 ⚙ 设置里直接填写
 
 # 启动服务
 python main.py

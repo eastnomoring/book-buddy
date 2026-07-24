@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import ChatInterface from './components/ChatInterface.vue'
 import CameraCapture from './components/CameraCapture.vue'
 import BookSelector from './components/BookSelector.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 
 const currentBookId = ref<string | null>(null)
 const currentPage = ref<number>(1)
@@ -28,7 +29,10 @@ function onImageCaptured(imageBase64: string) {
         <p class="brand-mark">Book Buddy</p>
         <p class="brand-line">读硬书时的 AI 伴读</p>
       </div>
-      <BookSelector @select="onBookSelected" />
+      <div class="masthead-actions">
+        <BookSelector @select="onBookSelected" />
+        <SettingsPanel />
+      </div>
     </header>
 
     <main class="stage">
@@ -93,6 +97,12 @@ function onImageCaptured(imageBase64: string) {
   font-weight: 400;
   color: var(--muted);
   letter-spacing: 0.02em;
+}
+
+.masthead-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .stage {

@@ -12,6 +12,12 @@ from app.models.chat import (
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
 )
+from app.models.config import (
+    ConfigResponse,
+    ConfigUpdate,
+    ConfigTestRequest,
+    ConfigTestResult,
+)
 
 __all__ = [
     "ChatMessage",
@@ -25,4 +31,8 @@ __all__ = [
     "VoiceTranscribeResponse",
     "VoiceSynthesizeRequest",
     "VoiceSynthesizeResponse",
+    "ConfigResponse",
+    "ConfigUpdate",
+    "ConfigTestRequest",
+    "ConfigTestResult",
 ]

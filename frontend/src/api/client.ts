@@ -47,6 +47,26 @@ export interface VoiceTranscribeResponse {
   duration: number
 }
 
+export interface AppConfig {
+  provider: string
+  baseUrl?: string
+  model: string
+  apiKeyMasked: string
+  configured: boolean
+}
+
+export interface ConfigUpdatePayload {
+  provider: string
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+}
+
+export interface ConfigTestResult {
+  ok: boolean
+  message: string
+}
+
 function mapBookInfo(raw: Record<string, unknown>): BookInfo {
   const chaptersRaw = (raw.chapters as Array<Record<string, unknown>>) || []
   return {
@@ -183,4 +203,41 @@ export async function synthesizeVoice(text: string, voice?: string): Promise<str
     voice,
   })
   return response.data.audio
+}
+
+// 配置
+function mapConfig(raw: Record<string, unknown>): AppConfig {
+  return {
+    provider: String(raw.provider ?? 'openai'),
+    baseUrl: raw.base_url ? String(raw.base_url) : undefined,
+    model: String(raw.model ?? ''),
+    apiKeyMasked: String(raw.api_key_masked ?? ''),
+    configured: Boolean(raw.configured),
+  }
+}
+
+export async function getConfig(): Promise<AppConfig> {
+  const response = await api.get('/config')
+  return mapConfig(response.data as Record<string, unknown>)
+}
+
+export async function updateConfig(payload: ConfigUpdatePayload): Promise<AppConfig> {
+  const response = await api.put('/config', {
+    provider: payload.provider,
+    api_key: payload.apiKey || undefined,
+    base_url: payload.baseUrl || undefined,
+    model: payload.model || undefined,
+  })
+  return mapConfig(response.data as Record<string, unknown>)
+}
+
+export async function testConfig(payload: ConfigUpdatePayload): Promise<ConfigTestResult> {
+  const response = await api.post('/config/test', {
+    provider: payload.provider,
+    api_key: payload.apiKey || undefined,
+    base_url: payload.baseUrl || undefined,
+    model: payload.model || undefined,
+  })
+  const raw = response.data as Record<string, unknown>
+  return { ok: Boolean(raw.ok), message: String(raw.message ?? '') }
 }

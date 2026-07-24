@@ -53,11 +53,12 @@ async def health():
     }
 
 # 注册路由
-from app.routers import chat, voice, book
+from app.routers import chat, voice, book, config
 
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(voice.router, prefix="/api", tags=["voice"])
 app.include_router(book.router, prefix="/api", tags=["books"])
+app.include_router(config.router, prefix="/api", tags=["config"])
 
 
 if __name__ == "__main__":

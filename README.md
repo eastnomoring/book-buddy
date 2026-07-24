@@ -26,7 +26,8 @@ pip install -r requirements.txt
 
 # 配置环境变量
 cp .env.example .env
-# 编辑 .env，填入你的 DASHSCOPE_API_KEY
+# 编辑 .env，填入你的智谱 API Key（https://open.bigmodel.cn/ 创建）
+# 默认使用 GLM-4.6V（多模态）+ embedding-3（向量嵌入）
 
 # 启动服务
 python main.py
@@ -48,7 +49,7 @@ npm run dev
 
 ## 技术栈
 
-- 后端：Python, FastAPI, Qwen-VL, Chroma
+- 后端：Python, FastAPI, 智谱 GLM-4.6V（OpenAI 兼容接口，可换通义千问/硅基流动/Ollama）, Chroma
 - 前端：Vue 3, TypeScript, Vite
 
 ## License

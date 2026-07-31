@@ -34,12 +34,16 @@ def update_env_file(updates: Dict[str, str], path: Path = ENV_PATH) -> None:
 
 
 def mask_key(key: Optional[str]) -> str:
-    """key 掩码：前 3 位 + *** + 后 4 位"""
+    """key 掩码：仅露后 4 位，避免泄露可辨识前缀。
+
+    智谱/通义千问等 Key 长达 32+ 位，若同时暴露前缀与后缀，
+    配合公开的 base_url 会显著缩小爆破空间，因此只保留后 4 位。
+    """
     if not key:
         return ""
-    if len(key) <= 7:
+    if len(key) <= 4:
         return "***"
-    return f"{key[:3]}***{key[-4:]}"
+    return f"***{key[-4:]}"
 
 
 def apply_to_settings(updates: Dict[str, str]) -> None:
@@ -58,4 +62,4 @@ def apply_to_settings(updates: Dict[str, str]) -> None:
 
     # 嵌入函数持有旧 key/base_url，置为未初始化以便下次惰性重建
     from app.services.rag import rag_service
-    rag_service.vector_store._initialized = False
+    rag_service.vector_store.invalidate()

@@ -33,8 +33,10 @@ def test_update_env_file_uncomments_and_dedupes(tmp_path):
 @pytest.mark.parametrize("key,expected", [
     (None, ""),
     ("", ""),
-    ("short", "***"),
-    ("a93e39215af84554b98e7c44c4679b61.uWJhKNGiTbTaskP4", "a93***skP4"),
+    ("1234", "***"),          # 恰好 4 位 → 完全隐藏
+    ("12345", "***2345"),     # 5 位 → 露后 4 位
+    ("short", "***hort"),     # 5 位 → 露后 4 位
+    ("a93e39215af84554b98e7c44c4679b61.uWJhKNGiTbTaskP4", "***skP4"),
 ])
 def test_mask_key(key, expected):
     assert mask_key(key) == expected

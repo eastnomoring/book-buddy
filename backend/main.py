@@ -14,8 +14,15 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时：初始化向量库、MCP 连接等
     print("🚀 Book Buddy Backend 启动...")
+    # 启动时从磁盘重建书籍索引（PDF 与向量数据已持久化）
+    try:
+        from app.routers.book import rebuild_books_index
+        n = rebuild_books_index()
+        if n:
+            print(f"📖 已恢复 {n} 本书的索引")
+    except Exception as e:
+        print(f"⚠️ 恢复书籍索引失败: {e}")
     yield
     # 关闭时：清理资源
     print("👋 Book Buddy Backend 关闭")

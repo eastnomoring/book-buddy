@@ -1,12 +1,17 @@
 """应用配置管理"""
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """应用配置"""
-    
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
+
     # API Keys
     dashscope_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
@@ -37,10 +42,6 @@ class Settings(BaseSettings):
     app_name: str = "Book Buddy"
     debug: bool = True
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 # 全局配置实例

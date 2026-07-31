@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { streamChat, type ChatMessage } from '../api/client'
+import { renderRichText } from '../utils/render'
 
 const props = defineProps<{
   bookId?: string | null
@@ -22,24 +23,6 @@ const hasPendingImage = ref(false)
 watch(() => props.image, (newImage) => {
   hasPendingImage.value = !!newImage
 })
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-function renderMarkdown(text: string): string {
-  const escaped = escapeHtml(text)
-  return escaped
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-}
 
 async function sendMessage() {
   const text = inputText.value.trim()
@@ -134,7 +117,7 @@ function scrollToBottom() {
         :class="msg.role"
       >
         <div class="bubble-label">{{ msg.role === 'user' ? '你' : '伴读' }}</div>
-        <div class="bubble-body" v-html="renderMarkdown(msg.content)"></div>
+        <div class="bubble-body" v-html="renderRichText(msg.content)"></div>
       </div>
 
       <div

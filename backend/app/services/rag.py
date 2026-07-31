@@ -197,6 +197,15 @@ class VectorStore:
         except Exception as e:
             raise RuntimeError(f"初始化向量库失败: {str(e)}") from e
 
+    def invalidate(self) -> None:
+        """标记向量库为未初始化，下次访问时按当前配置惰性重建。
+
+        在 API Key / embedding 提供商变更后调用，使旧的 embedding
+        函数（持有旧凭据）被丢弃，避免用旧配置继续检索。
+        """
+        self._initialized = False
+        self.collection = None
+
     def add_chunks(self, chunks: List[Dict], book_id: str):
         """添加文档块到向量库（先清理同书旧数据）"""
         self._ensure_initialized()

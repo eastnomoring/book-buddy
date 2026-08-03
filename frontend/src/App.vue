@@ -26,7 +26,20 @@ function onImageCaptured(imageBase64: string) {
   <div class="app">
     <header class="masthead">
       <div class="brand-block">
-        <p class="brand-mark">Book Buddy</p>
+        <div class="brand-row">
+          <span class="brand-logo" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 6.2C10.4 4.9 8.2 4.3 5.5 4.3c-.6 0-1.2.05-1.8.15v12.6c.6-.1 1.2-.15 1.8-.15 2.7 0 4.9.6 6.5 1.9 1.6-1.3 3.8-1.9 6.5-1.9.6 0 1.2.05 1.8.15V4.45c-.6-.1-1.2-.15-1.8-.15-2.7 0-4.9.6-6.5 1.9Z"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linejoin="round"
+              />
+              <path d="M12 6.2v12.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+          </span>
+          <p class="brand-mark">Book Buddy</p>
+        </div>
         <p class="brand-line">读硬书时的 AI 伴读</p>
       </div>
       <div class="masthead-actions">
@@ -69,13 +82,19 @@ function onImageCaptured(imageBase64: string) {
 }
 
 .masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1.5rem;
-  padding-bottom: 1.35rem;
+  margin: -1.5rem -1.25rem 1.5rem;
+  padding: 1.1rem 1.25rem 1.15rem;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 1.5rem;
+  background: rgba(240, 244, 246, 0.72);
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
   animation: rise-in 0.7s var(--ease);
 }
 
@@ -83,9 +102,27 @@ function onImageCaptured(imageBase64: string) {
   min-width: 0;
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.brand-logo {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 12px;
+  color: #f2fffa;
+  background: var(--accent-gradient);
+  box-shadow: var(--shadow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
 .brand-mark {
   font-family: var(--font-display);
-  font-size: clamp(2.4rem, 4.5vw, 3.4rem);
+  font-size: clamp(2rem, 4vw, 2.9rem);
   line-height: 1;
   letter-spacing: -0.02em;
   color: var(--ink);

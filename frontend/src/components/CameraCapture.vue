@@ -130,11 +130,23 @@ onUnmounted(() => {
       />
 
       <div v-if="!isStreaming && !capturedPreview" class="idle">
-        <span class="idle-mark" aria-hidden="true"></span>
+        <span class="idle-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2L9 4.8A1 1 0 0 1 9.9 4.4h4.2a1 1 0 0 1 .9.4l1.5 2.2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linejoin="round"
+            />
+            <circle cx="12" cy="12.8" r="3.2" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </span>
         <p>开启摄像头拍摄纸质书页</p>
       </div>
 
-      <div v-if="isStreaming && !capturedPreview" class="live-tag">取景中</div>
+      <div v-if="isStreaming && !capturedPreview" class="live-tag">
+        <i class="live-dot" aria-hidden="true"></i>取景中
+      </div>
     </div>
 
     <canvas ref="canvasRef" hidden></canvas>
@@ -207,6 +219,7 @@ onUnmounted(() => {
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink);
+  border-radius: 10px;
 }
 
 .viewport {
@@ -214,20 +227,22 @@ onUnmounted(() => {
   flex: 1;
   min-height: 320px;
   aspect-ratio: 3 / 4;
-  border-radius: calc(var(--radius) - 4px);
+  border-radius: calc(var(--radius) - 2px);
   overflow: hidden;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lift), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   background:
+    radial-gradient(420px 300px at 50% 0%, rgba(26, 107, 92, 0.18), transparent 60%),
     linear-gradient(160deg, #1c2430 0%, #2a3540 100%);
 }
 
 .viewport.live {
-  outline: 1px solid rgba(26, 107, 92, 0.45);
-  outline-offset: -1px;
+  border-color: rgba(26, 107, 92, 0.55);
+  box-shadow: var(--shadow-lift), 0 0 0 3px var(--accent-soft);
 }
 
 .viewport.snapped {
-  outline: 1px solid rgba(26, 107, 92, 0.35);
-  outline-offset: -1px;
+  border-color: rgba(26, 107, 92, 0.4);
 }
 
 .feed {
@@ -244,7 +259,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.85rem;
+  gap: 0.95rem;
   color: rgba(247, 249, 250, 0.72);
   font-size: 0.9rem;
   text-align: center;
@@ -252,33 +267,40 @@ onUnmounted(() => {
 }
 
 .idle-mark {
-  width: 42px;
-  height: 42px;
-  border: 1.5px solid rgba(247, 249, 250, 0.35);
-  border-radius: 50% 50% 40% 60%;
-  position: relative;
-}
-
-.idle-mark::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 1.5px solid rgba(247, 249, 250, 0.55);
-  border-radius: 40% 60% 50% 50%;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border: 1px solid rgba(247, 249, 250, 0.22);
+  border-radius: 18px;
+  color: rgba(247, 249, 250, 0.75);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .live-tag {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
-  padding: 0.28rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #e8fff8;
-  background: rgba(26, 107, 92, 0.85);
-  border-radius: 4px;
-  animation: pulse-soft 1.8s ease-in-out infinite;
+  background: rgba(20, 84, 71, 0.85);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(232, 255, 248, 0.22);
+  border-radius: 999px;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7be0c4;
+  animation: pulse-soft 1.6s ease-in-out infinite;
 }
 
 .actions {

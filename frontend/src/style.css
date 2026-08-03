@@ -19,6 +19,10 @@
   --user-bubble: #152028;
   --assistant-bubble: rgba(255, 255, 255, 0.88);
   --shadow-soft: 0 18px 40px rgba(21, 32, 40, 0.06);
+  --shadow-lift: 0 6px 16px rgba(21, 32, 40, 0.1), 0 2px 4px rgba(21, 32, 40, 0.06);
+  --shadow-pop: 0 24px 60px rgba(21, 32, 40, 0.14), 0 4px 12px rgba(21, 32, 40, 0.08);
+  --shadow-accent: 0 6px 18px rgba(26, 107, 92, 0.32);
+  --accent-gradient: linear-gradient(135deg, #22907b 0%, #1a6b5c 55%, #145447 100%);
   --radius: 14px;
   --radius-sm: 8px;
   --font-display: "DM Serif Display", "Times New Roman", serif;
@@ -66,6 +70,47 @@ body::before {
   z-index: 1;
 }
 
+/* Text selection — forest wash */
+::selection {
+  background: rgba(26, 107, 92, 0.22);
+  color: var(--ink);
+}
+
+/* Keyboard focus ring */
+:focus-visible {
+  outline: 2px solid rgba(26, 107, 92, 0.65);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(21, 32, 40, 0.16);
+  border-radius: 999px;
+  border: 2.5px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 107, 92, 0.38);
+  border: 2.5px solid transparent;
+  background-clip: padding-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(21, 32, 40, 0.22) transparent;
+}
+
 button,
 input,
 textarea,
@@ -107,7 +152,12 @@ textarea:focus {
   font-size: 0.92rem;
   font-weight: 500;
   letter-spacing: 0.01em;
-  transition: transform 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease),
+    color 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .btn:active:not(:disabled) {
@@ -120,23 +170,26 @@ textarea:focus {
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--accent-gradient);
   color: #f7fffc;
+  box-shadow: 0 2px 6px rgba(26, 107, 92, 0.25);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-deep);
+  box-shadow: var(--shadow-accent);
+  filter: brightness(1.06);
 }
 
 .btn-ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.5);
   color: var(--ink-soft);
   border: 1px solid var(--line);
 }
 
 .btn-ghost:hover:not(:disabled) {
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.55);
+  background: #fff;
+  box-shadow: var(--shadow-lift);
 }
 
 .katex-display {

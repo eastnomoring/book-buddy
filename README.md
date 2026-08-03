@@ -48,6 +48,12 @@ npm run dev
 
 访问 http://localhost:5173
 
+### 语音功能（可选）
+
+语音识别（ASR）与朗读（TTS）使用阿里云百炼 DashScope（qwen3-asr-flash + cosyvoice-v2）。
+在网页右上角 ⚙ 设置的「语音服务」区域填入 DashScope Key（https://bailian.console.aliyun.com/ 创建）即可启用；
+未配置时自动降级为浏览器自带的语音识别与朗读（Chrome/Edge 可用）。
+
 ## 技术栈
 
 - 后端：Python, FastAPI, 智谱 GLM-4.6V（OpenAI 兼容接口，可换通义千问/硅基流动/Ollama）, Chroma

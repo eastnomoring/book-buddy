@@ -39,12 +39,15 @@ def _current_base_url() -> str:
 async def get_config():
     """获取当前 LLM 配置（key 只返回掩码）"""
     key = _current_key()
+    voice_key = settings.dashscope_api_key or ""
     return ConfigResponse(
         provider=settings.llm_provider,
         base_url=_current_base_url(),
         model=_current_model(),
         api_key_masked=mask_key(key),
         configured=bool(key),
+        voice_configured=bool(voice_key),
+        voice_api_key_masked=mask_key(voice_key),
     )
 
 
@@ -68,6 +71,10 @@ async def update_config(update: ConfigUpdate):
             env_updates["DASHSCOPE_API_KEY"] = update.api_key
         if update.model:
             env_updates["LLM_MODEL"] = update.model
+
+    # 语音服务 key 独立更新，不影响上面的 LLM provider 切换
+    if update.voice_api_key:
+        env_updates["DASHSCOPE_API_KEY"] = update.voice_api_key
 
     try:
         update_env_file(env_updates)

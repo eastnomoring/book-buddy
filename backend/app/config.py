@@ -35,8 +35,10 @@ class Settings(BaseSettings):
     
     # 语音配置
     asr_provider: str = "qwen"  # qwen | aliyun
+    asr_model: str = "qwen3-asr-flash"  # DashScope 语音识别模型
     tts_provider: str = "qwen"
-    tts_voice: str = "longxiaochun"  # 通义千问 TTS 音色
+    tts_model: str = "cosyvoice-v2"  # DashScope 语音合成模型
+    tts_voice: str = "longxiaochun_v2"  # cosyvoice-v2 音色
     
     # 应用配置
     app_name: str = "Book Buddy"

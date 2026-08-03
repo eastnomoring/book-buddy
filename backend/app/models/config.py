@@ -10,6 +10,9 @@ class ConfigResponse(BaseModel):
     model: str
     api_key_masked: str = ""
     configured: bool = False
+    # 语音服务（DashScope ASR/TTS），key 独立于 LLM provider 配置
+    voice_configured: bool = False
+    voice_api_key_masked: str = ""
 
 
 class ConfigUpdate(BaseModel):
@@ -18,6 +21,8 @@ class ConfigUpdate(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     model: Optional[str] = None
+    # 语音服务 key；留空表示保留原 key，不影响 LLM provider 切换
+    voice_api_key: Optional[str] = None
 
 
 class ConfigTestRequest(BaseModel):

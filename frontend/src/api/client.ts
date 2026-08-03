@@ -53,6 +53,8 @@ export interface AppConfig {
   model: string
   apiKeyMasked: string
   configured: boolean
+  voiceConfigured: boolean
+  voiceApiKeyMasked: string
 }
 
 export interface ConfigUpdatePayload {
@@ -60,6 +62,7 @@ export interface ConfigUpdatePayload {
   apiKey?: string
   baseUrl?: string
   model?: string
+  voiceApiKey?: string
 }
 
 export interface ConfigTestResult {
@@ -213,6 +216,8 @@ function mapConfig(raw: Record<string, unknown>): AppConfig {
     model: String(raw.model ?? ''),
     apiKeyMasked: String(raw.api_key_masked ?? ''),
     configured: Boolean(raw.configured),
+    voiceConfigured: Boolean(raw.voice_configured),
+    voiceApiKeyMasked: String(raw.voice_api_key_masked ?? ''),
   }
 }
 
@@ -227,6 +232,7 @@ export async function updateConfig(payload: ConfigUpdatePayload): Promise<AppCon
     api_key: payload.apiKey || undefined,
     base_url: payload.baseUrl || undefined,
     model: payload.model || undefined,
+    voice_api_key: payload.voiceApiKey || undefined,
   })
   return mapConfig(response.data as Record<string, unknown>)
 }

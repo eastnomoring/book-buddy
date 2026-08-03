@@ -38,6 +38,7 @@ Thumbs.db
 
 # Data
 backend/data/books/*.pdf
+backend/data/books/*.json
 backend/data/*.db
 backend/data/chroma/
 

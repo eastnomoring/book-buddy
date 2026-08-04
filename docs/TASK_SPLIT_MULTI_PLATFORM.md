@@ -269,6 +269,20 @@
   单测证明重叠：`test_tts_overlaps_with_later_deltas`（首句 audio 在 `done` 前到达）。实网数字依赖 DashScope：开朗读问一句，看 Network 是否不再逐句打 synthesize、以及 voice 响应的 `elapsed_ms`。
 
   **测试**：`test_stream_tts` + voice/SSE 契约；core 21；后端全量绿。剩余 **Z5**（需 GitHub push）。
+- [2026-08-04][整理/协作] **仓库已上 GitHub**：`eastnomoring/book-buddy`（PUBLIC）。首推密钥扫描干净；core 21 + 后端 110 绿。
+  - CI 首跑失败：`pnpm/action-setup@v4` 显式 `version: 11` 与根 `packageManager: pnpm@11.18.0` 冲突 → 已删显式 version（`553749f`），改由 action 读 `packageManager`。
+  - **Z5 进入可验收窗口**：Desktop Build workflow 将真跑 mac/win/linux；跟进 Actions 绿 + artifact 可下载后标 done。macOS 签名/公证仍属可选（需开发者证书）。
+- [2026-08-04][Cursor] **Z5 完成 (done 2026-08-04)**。Desktop Build 三平台全绿，artifact 可下载。
+  - 根因与修复：①缺 `apps/web/dist`（打包前补 `core`+`web` build）；②macOS 双 `--target` 不被当前 CLI 接受 → 改为原生单架构；③`upload-artifact` 上传 `book-buddy-{macos,windows,ubuntu}`。
+  - 验证 run：https://github.com/eastnomoring/book-buddy/actions/runs/30893163529 （mac 4m51s / win 7m21s / linux 26m27s）。
+  - 可选遗留：macOS 签名/公证（需开发者证书）；universal 双架构包。
+
+  第五轮可关单项：Z1–Z5、C1–C2 已完成；仍开：C3（真机）、C4（UI）、Z3 搜索暂缓。
+- [2026-08-04][Cursor] **C4 完成 (done 2026-08-04)**。web 工具气泡与加载态打磨：
+  - 长 `preview`（>280 字）默认折叠 +「展开全部/收起」；工具中文标签（代码执行/生成卡片/保存笔记）+ 旁注原名。
+  - 流式期间空 assistant 气泡内显示打字点（修复原先插空气泡后加载动画消失）。
+  - 暗色模式评估：工作量大，**单列下轮**（现有 ink/forest 浅色体系保持）。
+  - `vue-tsc` + web build 通过。第五轮代码项仅剩 **C3（等真机）** 与搜索暂缓。
 
 ---
 
@@ -470,12 +484,12 @@
 - **依赖**：无，可并行
 - **验收**：延迟对比数据写进 §5 留言；全量测试不回归
 
-### Z5 — 桌面三平台打包验证（Zcode：.github + apps/desktop 构建问题修复，小）
+### Z5 — 桌面三平台打包验证（Zcode → Cursor 跟进：.github + apps/desktop，小）(done 2026-08-04)
 
 - **背景**：S5 的 `desktop.yml` 已就绪，但未经真实 CI 运行验证；macOS 签名/公证未做
 - **范围**：`.github/workflows/desktop.yml`、构建失败时的 `apps/desktop/**` 配置修复
 - **内容**：仓库推送后跟进 CI 运行结果，修复三平台打包问题；macOS 签名/公证属可选增强（需开发者证书，先与用户确认）
-- **依赖**：**仓库 push 到 GitHub 后才有意义**
+- **依赖**：**仓库 push 到 GitHub 后才有意义**（已满足）
 - **验收**：三平台 CI 绿，产物 artifact 可下载
 
 ### C1 — T1 web 端工具事件展示收尾（Cursor：apps/web，小）(done 2026-08-04)
@@ -504,7 +518,7 @@
 - **依赖**：**用户完成真机验证并提供反馈后**
 - **验收**：`build:mp-weixin` 通过；修复项逐条对应真机反馈闭环
 
-### C4 — UI/UX 打磨（Cursor：apps/web，低优先）
+### C4 — UI/UX 打磨（Cursor：apps/web，低优先）(done 2026-08-04)
 
 - **背景**：功能已齐，界面细节待打磨
 - **范围**：`apps/web/**`

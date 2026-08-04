@@ -3,7 +3,7 @@ name: Desktop Build
 # 桌面端三平台打包（macOS / Windows / Linux）。
 # 仓库 push 到 GitHub 后生效。产物作为 artifact 上传。
 #
-# 产物路径（tauri-action 默认）：
+# 产物路径（tauri bundle）：
 #   macOS:   *.dmg / *.app
 #   Windows: *.msi / *.exe (nsis)
 #   Linux:   *.deb / *.AppImage / *.rpm
@@ -11,19 +11,20 @@ name: Desktop Build
 on:
   push:
     branches: [master, main]
-    tags: ["v*"]  # 打 tag 时触发发布构建
+    tags: ["v*"]
   pull_request:
     branches: [master, main]
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   build-tauri:
     strategy:
-      fail-fast: false  # 一个平台失败不影响其他
+      fail-fast: false
       matrix:
         include:
+          # macos-latest 现为 Apple Silicon；双 --target 不被当前 CLI 接受
           - platform: macos-latest
-            args: "--target aarch64-apple-darwin --target x86_64-apple-darwin"
+            args: ""
           - platform: ubuntu-22.04
             args: ""
           - platform: windows-latest
@@ -33,22 +34,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # pnpm 须在 setup-node(cache: pnpm) 之前安装
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          # pnpm@11.18 需要 Node >= 22.13（node:sqlite）
           node-version: "22"
           cache: "pnpm"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          # macOS 双架构
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin x86_64-apple-darwin' || '' }}
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -64,17 +60,35 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build core (dependency of web)
-        run: pnpm --filter @book-buddy/core build
+      # frontendDist 指向 apps/web/dist，打包前必须先产出静态资源
+      - name: Build core + web
+        run: |
+          pnpm --filter @book-buddy/core build
+          pnpm --filter @book-buddy/web build
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/desktop
-          # tag 触发时上传到 Release，否则只构建
           tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: "Book Buddy ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload desktop artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-buddy-${{ matrix.platform }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/dmg
+            apps/desktop/src-tauri/target/release/bundle/macos
+            apps/desktop/src-tauri/target/release/bundle/msi
+            apps/desktop/src-tauri/target/release/bundle/nsis
+            apps/desktop/src-tauri/target/release/bundle/deb
+            apps/desktop/src-tauri/target/release/bundle/appimage
+            apps/desktop/src-tauri/target/release/bundle/rpm
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,129 +1,130 @@
 # 项目结构
 
+> 已更新为 monorepo 四端现状（2026-08-04）。
+
 ```
 book-buddy/
-├── README.md                # 项目主文档（给用户看）
-├── HANDOFF.md               # 交接文档（给下一个开发者/智能体看）
-├── ARCHITECTURE.md          # 本文件：目录结构说明
+├── README.md                # 项目主文档
+├── HANDOFF.md               # 交接文档
+├── ARCHITECTURE.md          # 本文件
 ├── LICENSE                  # MIT
 ├── .gitignore
+├── package.json             # monorepo 根（pnpm workspace 编排脚本）
+├── pnpm-workspace.yaml      # workspace 声明：apps/* + packages/*
 │
-├── backend/                 # Python 后端
-│   ├── main.py              # FastAPI 入口
+├── backend/                 # Python 后端（FastAPI）—— Zcode 维护
+│   ├── main.py              # 入口，注册所有路由 + 中间件
 │   ├── requirements.txt
-│   ├── pyproject.toml       # 可选：现代 Python 项目配置
+│   ├── .env.example
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── config.py        # 配置管理（API Key 等）
+│   │   ├── config.py        # Pydantic Settings 配置
 │   │   ├── routers/
-│   │   │   ├── chat.py      # 对话接口
-│   │   │   ├── voice.py     # 语音接口
-│   │   │   └── book.py      # 书籍上传/解析
+│   │   │   ├── chat.py      # 对话（含流式 SSE）
+│   │   │   ├── voice.py     # 语音转写/合成
+│   │   │   ├── book.py      # 书籍上传/检索/删除
+│   │   │   ├── config.py    # LLM/语音 配置管理
+│   │   │   └── formula.py   # 公式渲染（LaTeX → SVG/PNG）
 │   │   ├── services/
-│   │   │   ├── llm.py       # LLM 封装（Qwen/DeepSeek）
-│   │   │   ├── asr.py       # 语音识别（Qwen-Audio）
-│   │   │   ├── tts.py       # 语音合成（流式）
-│   │   │   ├── rag.py       # RAG 管道（向量检索）
-│   │   │   ├── pdf_parser.py# PDF 解析（marker/nougat）
-│   │   │   └── mcp_client.py# MCP 客户端封装
-│   │   └── models/          # Pydantic 模型
-│   │       ├── chat.py
-│   │       └── book.py
-│   ├── data/                # 本地数据（书籍 PDF、向量库）
-│   │   └── books/
-│   └── tests/
+│   │   │   ├── llm.py       # LLM（Qwen-VL / OpenAI 兼容：智谱 GLM）
+│   │   │   ├── voice.py     # ASR/TTS（DashScope qwen3-asr / cosyvoice）
+│   │   │   ├── rag.py       # PDF 解析 + Chroma 向量检索
+│   │   │   ├── formula.py   # matplotlib mathtext 公式渲染
+│   │   │   └── config_store.py  # .env 持久化 + 热更新
+│   │   ├── middleware/
+│   │   │   └── auth.py      # 可选 token 鉴权（AUTH_TOKEN 控制）
+│   │   └── models/          # Pydantic 请求/响应模型
+│   └── tests/               # pytest（57 测试）
 │
-├── frontend/                # Web 前端
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── src/
-│   │   ├── main.ts
-│   │   ├── App.vue          # 或 App.tsx（框架待定）
-│   │   ├── components/
-│   │   │   ├── Camera.vue   # 摄像头组件
-│   │   │   ├── Chat.vue     # 对话界面
-│   │   │   ├── VoiceButton.vue
-│   │   │   └── Formula.vue  # KaTeX 公式渲染
-│   │   ├── api/
-│   │   │   └── client.ts    # 后端 API 调用
-│   │   └── stores/          # 状态管理（Pinia / Zustand）
-│   └── public/
+├── packages/
+│   └── core/                # 跨端共享层（纯 TS，零 DOM/wx 依赖）—— Zcode 维护
+│       ├── src/
+│       │   ├── types.ts     # ChatMessage / ChatRequest / BookInfo 等类型
+│       │   ├── api.ts       # API 路径常量 + 请求体组装（snake_case 映射）
+│       │   ├── sse.ts       # SSEParser（纯字符串帧解析）
+│       │   ├── tts.ts       # SentenceStreamer（按句切分流式朗读）
+│       │   ├── platform.ts  # 平台适配接口定义（ChatTransport 等，Z1 冻结）
+│       │   └── index.ts     # 统一导出
+│       ├── test/            # node:test 契约测试（14 测试）
+│       └── dist/            # tsc 构建产物
 │
-├── docs/                    # 文档
-│   ├── setup.md             # 详细安装指南
-│   ├── mcp-integration.md   # MCP 接入说明
-│   └── roadmap.md           # 路线图详解
+├── apps/
+│   ├── web/                 # Web 端（Vue 3 + Vite + TS）—— Zcode 维护
+│   │   └── src/
+│   │       ├── platform/    # core 平台接口的 Web 实现（ChatTransport 等）
+│   │       ├── components/  # ChatInterface / CameraCapture / BookSelector / SettingsPanel
+│   │       ├── utils/       # render.ts（marked+KaTeX+DOMPurify）、audio.ts、tts.ts
+│   │       └── api/         # client.ts（HTTP 请求封装）
+│   │
+│   ├── mp/                  # 微信小程序（uni-app Vue3）—— Kimi 维护
+│   │   └── src/
+│   │       ├── pages/index/ # 对话页
+│   │       └── platform/    # chat.ts（wx.request chunked SSE adapter）
+│   │
+│   └── desktop/             # 桌面端（Tauri 2 壳）—— Kimi 维护
 │
-└── scripts/                 # 辅助脚本
-    ├── ingest_book.py       # 导入一本书到向量库
-    └── test_voice.py        # 语音链路测试
+├── scripts/
+│   ├── start.mjs            # 一键启动脚本（--dev / --desktop）
+│   └── make_test_pdf.py     # 测试 PDF 生成
+│
+├── docs/
+│   ├── migration-multi-platform.md   # 多端迁移方案蓝图
+│   ├── TASK_SPLIT_MULTI_PLATFORM.md  # 双智能体任务拆分与协调记录
+│   ├── CHANGES_REVIEW_ROUND2.md      # RAG/LLM/配置审阅
+│   ├── CHANGES_REVIEW_ROUND3.md      # 语音链路审阅
+│   ├── CHANGES_REVIEW_ROUND4.md      # 多端迁移 Z1~Z5 实现
+│   └── ...
+│
+└── .github/
+    └── workflows/
+        └── ci.yml           # GitHub Actions CI
 ```
 
-## 关键模块说明
+## 技术栈
 
-### backend/app/services/llm.py
-- 封装 Qwen-VL / DeepSeek 多模态调用
-- 支持图像 + 文本混合输入
-- 流式输出（SSE）
+| 层 | 技术 |
+|---|---|
+| 后端 | Python 3.11+, FastAPI, PyMuPDF, Chroma, matplotlib, DashScope |
+| LLM | 智谱 GLM-4.6V（默认）/ 通义千问 Qwen-VL / 任意 OpenAI 兼容 |
+| 共享层 | TypeScript, node:test |
+| Web | Vue 3, Vite, marked, KaTeX, DOMPurify |
+| 小程序 | uni-app (Vue 3), 微信小程序 |
+| 桌面 | Tauri 2（加载 Web 构建产物） |
+| 包管理 | pnpm workspace |
 
-### backend/app/services/rag.py
-- 书籍 PDF 解析（按章节分块）
-- 向量化（sentence-transformers / text-embedding）
-- 检索：给定问题 + 当前页信息，返回相关段落
+## 常用命令
 
-### backend/app/services/mcp_client.py
-- MCP 客户端管理（连接多个 MCP server）
-- 封装为可调用工具：代码执行、Anki、笔记等
+```bash
+# 安装所有依赖
+pnpm install
 
-### frontend/src/components/Camera.vue
-- getUserMedia 调用摄像头
-- 拍照 → 上传到后端
-- 显示预览与当前页定位结果
+# 一键启动（后端 + 前端）
+pnpm start            # 生产模式
+pnpm start:dev        # 开发模式（热重载）
 
-### frontend/src/components/Chat.vue
-- 对话界面：消息列表 + 输入框
-- KaTeX 渲染数学公式
-- 加载状态、错误处理
+# 单独启动
+pnpm dev:web          # Web 前端
+pnpm dev:mp           # 小程序
+pnpm dev:backend      # 后端
+pnpm dev:desktop      # 桌面端
 
----
+# 构建
+pnpm build            # core + web + mp-weixin
+pnpm build:desktop    # 含桌面端
 
-## 数据流（一次问答）
-
-```
-用户拍照/语音提问
-       │
-       ▼
-前端：Camera/VoiceButton → 捕获图像/音频
-       │
-       ▼
-POST /api/chat { image: base64, audio: base64, text: "" }
-       │
-       ▼
-后端：
-  1. ASR 音频 → 文本
-  2. 视觉模型识别页码/章节
-  3. RAG 检索相关段落
-  4. 构建提示词（问题 + 书籍上下文）
-  5. 调用 LLM（流式）
-  6. TTS 文本 → 音频（流式）
-       │
-       ▼
-前端：Chat 组件显示回答，播放 TTS 音频
+# 测试
+pnpm test             # core 测试 + 后端 pytest
 ```
 
----
+## 平台适配架构
 
-## 后续演进
-
-- **部署**：可用 Docker Compose 打包前后端，或用 Tauri 套壳为桌面应用
-- **云端**：前端部署到 Vercel/Cloudflare，后端可本地跑或部署到云服务器
-- **移动端**：如需原生 App，可用 Flutter 重写前端，后端不变
-
----
-
-## 代码风格约定
-
-- Python：遵循 PEP 8，类型注解，docstring 用 Google 风格
-- TypeScript/Vue：组件命名 PascalCase，API 调用集中到 `api/` 目录
-- 提交信息：遵循 Conventional Commits（feat/fix/docs/refactor）
+```
+packages/core（平台无关）
+  ├── 类型 / API 契约 / SSE 解析 / 句子切分
+  └── platform.ts 接口定义（ChatTransport / PhotoCapture / AudioRecorder / AudioPlayer）
+         ▲
+         │ 各端实现
+  ┌──────┼──────────┬──────────┐
+  │      │          │          │
+apps/web  apps/mp   apps/desktop
+(fetch)   (wx.req)  (Tauri)
+```

@@ -250,19 +250,38 @@ class VectorStore:
         query: str,
         book_id: Optional[str] = None,
         top_k: int = 5,
+        chapter: Optional[str] = None,
+        near_page: Optional[int] = None,
     ) -> List[Dict]:
-        """检索相关文档块"""
+        """检索相关文档块
+
+        Args:
+            chapter: 若提供，仅在该章节内检索（收窄当前页定位）
+            near_page: 若提供，优先返回靠近该页的结果（同章节内按页码接近度加权）
+        """
         self._ensure_initialized()
 
         if self.collection.count() == 0:
             return []
 
-        where_filter = {"book_id": book_id} if book_id else None
+        # 构建过滤条件
+        conditions = []
+        if book_id:
+            conditions.append({"book_id": book_id})
+        if chapter:
+            conditions.append({"chapter": chapter})
+
+        if len(conditions) == 1:
+            where_filter = conditions[0]
+        elif len(conditions) > 1:
+            where_filter = {"$and": conditions}
+        else:
+            where_filter = None
 
         try:
             results = self.collection.query(
                 query_texts=[query],
-                n_results=min(top_k, max(self.collection.count(), 1)),
+                n_results=min(top_k * 2, max(self.collection.count(), 1)),
                 where=where_filter,
             )
         except Exception as e:
@@ -277,14 +296,23 @@ class VectorStore:
         for i, doc in enumerate(documents):
             meta = metadatas[i] if i < len(metadatas) else {}
             distance = distances[i] if i < len(distances) else 1.0
+            page = meta.get("page", 0)
+            # near_page 加权：离目标页越近，score 越高
+            page_boost = 0.0
+            if near_page and isinstance(page, int) and page > 0:
+                page_dist = abs(page - near_page)
+                page_boost = max(0, 0.1 - page_dist * 0.005)  # 距离 20 页内有效
             chunks.append({
                 "content": doc,
-                "page": meta.get("page", 0),
+                "page": page,
                 "chapter": meta.get("chapter", ""),
-                "score": 1 - distance,
+                "score": 1 - distance + page_boost,
             })
 
-        return chunks
+        # 按 score 降序，取 top_k
+        chunks.sort(key=lambda c: c["score"], reverse=True)
+        return chunks[:top_k]
+
 
 
 class RAGService:
@@ -314,19 +342,24 @@ class RAGService:
         query: str,
         book_id: Optional[str] = None,
         top_k: int = 5,
+        chapter: Optional[str] = None,
+        near_page: Optional[int] = None,
     ) -> str:
-        """检索相关上下文，返回拼接后的文本"""
-        chunks = self.vector_store.search(query, book_id, top_k)
+        """检索相关上下文，返回拼接后的文本。
+
+        传入 chapter/near_page 时收窄到该章节并按页码接近度加权（当前页定位用）。
+        """
+        chunks = self.vector_store.search(query, book_id, top_k, chapter=chapter, near_page=near_page)
 
         if not chunks:
             return ""
 
         context_parts = []
         for chunk in chunks:
-            chapter = chunk.get("chapter") or ""
+            chapter_name = chunk.get("chapter") or ""
             header = f"[第 {chunk['page']} 页"
-            if chapter:
-                header += f" / {chapter}"
+            if chapter_name:
+                header += f" / {chapter_name}"
             header += "]"
             context_parts.append(f"{header}\n{chunk['content']}")
 
@@ -337,9 +370,11 @@ class RAGService:
         query: str,
         book_id: Optional[str] = None,
         top_k: int = 3,
+        chapter: Optional[str] = None,
+        near_page: Optional[int] = None,
     ) -> List[Dict]:
         """获取引用来源（用于显示）"""
-        return self.vector_store.search(query, book_id, top_k)
+        return self.vector_store.search(query, book_id, top_k, chapter=chapter, near_page=near_page)
 
     def delete_book(self, book_id: str) -> None:
         """删除书籍向量数据"""

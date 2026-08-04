@@ -17,10 +17,15 @@ class ChatRequest(BaseModel):
     """对话请求"""
     text: Optional[str] = Field(None, description="文本输入")
     image: Optional[str] = Field(None, description="图像 base64")
+    media_type: Optional[str] = Field(None, description="图片媒体类型，如 image/jpeg、image/png；缺省回退 image/jpeg")
     audio: Optional[str] = Field(None, description="音频 base64")
     book_id: Optional[str] = Field(None, description="当前书籍 ID")
     page_number: Optional[int] = Field(None, description="当前页码")
     history: List[ChatMessage] = Field(default_factory=list, description="对话历史")
+    enable_tts: bool = Field(
+        False,
+        description="Z4：流式对话时由服务端按句合成 TTS，经 type=audio 事件下发（省去前端每句 HTTP）",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -77,6 +82,7 @@ class VoiceTranscribeResponse(BaseModel):
     """语音转写响应"""
     text: str
     duration: float  # 秒
+    elapsed_ms: float = Field(0, description="服务端处理耗时（毫秒），用于延迟观测")
 
 
 class VoiceSynthesizeRequest(BaseModel):
@@ -89,3 +95,4 @@ class VoiceSynthesizeResponse(BaseModel):
     """语音合成响应"""
     audio: str  # base64
     duration: float
+    elapsed_ms: float = Field(0, description="服务端处理耗时（毫秒），用于延迟观测")

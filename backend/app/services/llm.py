@@ -158,25 +158,6 @@ class QwenVLService(LLMService):
             await asyncio.sleep(0)
 
 
-class DeepSeekService(LLMService):
-    """DeepSeek 服务（占位实现）"""
-
-    def __init__(self):
-        self.api_key = settings.deepseek_api_key
-        if not self.api_key:
-            raise ValueError("DEEPSEEK_API_KEY 未设置")
-
-    async def chat(
-        self,
-        text: str,
-        image: Optional[str] = None,
-        history: Optional[List[dict]] = None,
-        stream: bool = False,
-    ) -> Union[AsyncIterator[str], str]:
-        """TODO: 实现 DeepSeek VL 调用"""
-        raise NotImplementedError("DeepSeek 服务待实现")
-
-
 class OpenAICompatibleService(LLMService):
     """OpenAI 兼容接口服务（智谱 GLM / 硅基流动 / Ollama 通用）"""
 
@@ -189,11 +170,18 @@ class OpenAICompatibleService(LLMService):
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY 未设置")
 
+    @property
+    def _thinking_body(self) -> dict:
+        """GLM 思考模式 extra_body：enabled 时走 reasoning_content（适合复杂证明），
+        disabled 时降低首字延迟（适合日常问答）。"""
+        return {"thinking": {"type": "enabled" if settings.openai_thinking else "disabled"}}
+
     def _build_messages(
         self,
         text: str,
         image: Optional[str] = None,
         history: Optional[List[dict]] = None,
+        media_type: Optional[str] = None,
     ) -> List[dict]:
         messages: List[dict] = []
 
@@ -207,12 +195,14 @@ class OpenAICompatibleService(LLMService):
                 messages.append({"role": role, "content": content})
 
         if image:
+            # 用传入的 media_type 拼 data URI，缺省回退 jpeg（小程序相册可能选到 PNG/WebP）
+            mt = media_type or "image/jpeg"
             messages.append({
                 "role": "user",
                 "content": [
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{image}"},
+                        "image_url": {"url": f"data:{mt};base64,{image}"},
                     },
                     {"type": "text", "text": text},
                 ],
@@ -228,6 +218,7 @@ class OpenAICompatibleService(LLMService):
         image: Optional[str] = None,
         history: Optional[List[dict]] = None,
         stream: bool = False,
+        media_type: Optional[str] = None,
     ) -> Union[AsyncIterator[str], str]:
         """多模态对话，接口语义与 QwenVLService.chat 一致"""
         from openai import AsyncOpenAI
@@ -237,7 +228,7 @@ class OpenAICompatibleService(LLMService):
             base_url=self.base_url,
             timeout=self.timeout,
         )
-        messages = self._build_messages(text, image, history)
+        messages = self._build_messages(text, image, history, media_type)
 
         try:
             if stream:
@@ -246,6 +237,7 @@ class OpenAICompatibleService(LLMService):
             response = await client.chat.completions.create(
                 model=self.model,
                 messages=messages,
+                extra_body=self._thinking_body,
             )
             return response.choices[0].message.content or ""
 
@@ -258,6 +250,7 @@ class OpenAICompatibleService(LLMService):
             model=self.model,
             messages=messages,
             stream=True,
+            extra_body=self._thinking_body,
         )
         async for chunk in stream:
             if not chunk.choices:
@@ -266,6 +259,60 @@ class OpenAICompatibleService(LLMService):
             if delta:
                 yield delta
 
+    async def chat_with_tools(
+        self,
+        messages: List[dict],
+        tools: Optional[List[dict]] = None,
+    ) -> Any:
+        """带 tools 的非流式调用，返回原始 response（含 tool_calls）。
+
+        供 MCP tool loop 使用。返回原始 response 对象，调用方自行处理
+        content / tool_calls。
+        """
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=self.timeout,
+        )
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "extra_body": self._thinking_body,
+        }
+        if tools:
+            kwargs["tools"] = tools
+        response = await client.chat.completions.create(**kwargs)
+        return response
+
+    async def stream_with_tools(
+        self,
+        messages: List[dict],
+        tools: Optional[List[dict]] = None,
+    ):
+        """带 tools 的流式调用，返回流式响应（AsyncIterator[chunk]）。
+
+        供 MCP 流式 tool loop 使用。chunk 结构为 OpenAI 流式格式，
+        tool_calls 可能分片，调用方需自行累积拼接。
+        """
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=self.timeout,
+        )
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "extra_body": self._thinking_body,
+            "stream": True,
+        }
+        if tools:
+            kwargs["tools"] = tools
+        return await client.chat.completions.create(**kwargs)
+
 
 def get_llm_service() -> LLMService:
     """获取 LLM 服务实例"""
@@ -273,8 +320,11 @@ def get_llm_service() -> LLMService:
 
     if provider == "qwen":
         return QwenVLService()
-    if provider == "deepseek":
-        return DeepSeekService()
     if provider == "openai":
         return OpenAICompatibleService()
-    raise ValueError(f"不支持的 LLM 提供商: {provider}")
+    # DeepSeek VL 能力不成熟，已移除专用路径。
+    # 如需用 DeepSeek 文本能力，走 openai 兼容接口（provider=openai，填 DeepSeek base_url）
+    raise ValueError(
+        f"不支持的 LLM 提供商: {provider}。可选: qwen | openai。"
+        "DeepSeek 请用 openai 兼容接口（provider=openai + base_url 指向 DeepSeek）。"
+    )

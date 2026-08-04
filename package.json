@@ -1,0 +1,18 @@
+{
+  "name": "book-buddy",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "build": "pnpm --filter @book-buddy/core build && pnpm --filter @book-buddy/web build && pnpm --filter @book-buddy/mp build:mp-weixin",
+    "build:desktop": "pnpm build && pnpm --filter @book-buddy/desktop build",
+    "dev:web": "pnpm --filter @book-buddy/web dev",
+    "dev:mp": "pnpm --filter @book-buddy/mp dev:mp-weixin",
+    "dev:desktop": "pnpm --filter @book-buddy/desktop dev",
+    "dev:backend": "cd backend && .venv/bin/python -m uvicorn main:app --reload",
+    "start": "node scripts/start.mjs",
+    "start:dev": "node scripts/start.mjs --dev",
+    "start:desktop": "node scripts/start.mjs --desktop",
+    "test": "pnpm --filter @book-buddy/core test && cd backend && .venv/bin/python -m pytest tests/ -q"
+  }
+}

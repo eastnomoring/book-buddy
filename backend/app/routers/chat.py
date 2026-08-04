@@ -11,6 +11,8 @@ from app.models.chat import (
 from app.services.llm import get_llm_service, LLMService
 from app.services.rag import rag_service, RAGService
 from app.services.voice import get_asr_service, ASRService
+from app.services.page_locator import locate_page
+from app.config import settings
 
 router = APIRouter()
 
@@ -35,7 +37,14 @@ def _build_system_prompt(context: str, detailed: bool = True) -> str:
     return prompt
 
 
-def _retrieve_rag(rag: RAGService, user_text: str, book_id: str | None):
+def _retrieve_rag(
+    rag: RAGService,
+    user_text: str,
+    book_id: str | None,
+    chapter: str | None = None,
+    near_page: int | None = None,
+):
+    """同步检索（可被 to_thread 调用）。chapter/near_page 用于当前页定位收窄。"""
     context = ""
     sources: list[str] = []
     page_refs: list[int] = []
@@ -48,8 +57,13 @@ def _retrieve_rag(rag: RAGService, user_text: str, book_id: str | None):
             query=user_text or "当前书页内容",
             book_id=book_id,
             top_k=3,
+            chapter=chapter,
+            near_page=near_page,
         )
-        sources_data = rag.get_sources(user_text or "当前书页内容", book_id, 3)
+        sources_data = rag.get_sources(
+            user_text or "当前书页内容", book_id, 3,
+            chapter=chapter, near_page=near_page,
+        )
         sources = [s["content"][:200] for s in sources_data]
         page_refs = [s["page"] for s in sources_data]
     except Exception as e:
@@ -83,12 +97,28 @@ async def chat(
 
     retrieval_text = user_text  # 检索用原始问题，不混入页码提示
 
+    # 当前页定位：有图时先识别页码/章节，收窄 RAG（失败降级为整书 RAG）
+    located_chapter = None
+    located_page = None
+    if request.image and request.book_id:
+        located = await locate_page(llm, request.image, request.media_type)
+        located_chapter = located.get("chapter")
+        located_page = located.get("page")
+
     if request.page_number:
         page_hint = f"（用户当前在阅读第 {request.page_number} 页）"
         user_text = f"{page_hint}\n{user_text}" if user_text else page_hint
+    elif located_page:
+        # 识别到页码时告知 LLM，营造「它知道你在读哪页」的体验
+        loc_hint = f"（看起来你在读第 {located_page} 页"
+        if located_chapter:
+            loc_hint += f" / {located_chapter}"
+        loc_hint += "）"
+        user_text = f"{loc_hint}\n{user_text}" if user_text else loc_hint
 
     context, sources, page_refs = await asyncio.to_thread(
-        _retrieve_rag, rag, retrieval_text, request.book_id
+        _retrieve_rag, rag, retrieval_text, request.book_id,
+        located_chapter, located_page,
     )
     system_prompt = _build_system_prompt(context, detailed=True)
 
@@ -99,14 +129,29 @@ async def chat(
 
     try:
         full_prompt = f"{system_prompt}\n\n用户问题：{user_text or '请解释这张图片的内容'}"
-        response_text = await llm.chat(
-            text=full_prompt,
-            image=request.image,
-            history=history,
-            stream=False,
-        )
-        if not isinstance(response_text, str):
-            raise TypeError("非流式 LLM 应返回字符串")
+
+        # 任一活跃 MCP 工具（代码执行 / Anki / 笔记）时走 tool loop
+        from app.mcp.registry import should_use_tool_loop
+        if should_use_tool_loop():
+            from app.mcp.tool_loop import run_chat_with_tools
+            response_text = await run_chat_with_tools(
+                llm=llm,
+                system_prompt=system_prompt,
+                user_text=user_text or "请解释这张图片的内容",
+                history=history,
+                image=request.image,
+                media_type=request.media_type,
+            )
+        else:
+            response_text = await llm.chat(
+                text=full_prompt,
+                image=request.image,
+                history=history,
+                stream=False,
+                media_type=request.media_type,
+            )
+            if not isinstance(response_text, str):
+                raise TypeError("非流式 LLM 应返回字符串")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM 调用失败: {str(e)}") from e
 
@@ -136,12 +181,27 @@ async def chat_stream(
 
     retrieval_text = user_text  # 检索用原始问题，不混入页码提示
 
+    # 当前页定位（同非流式）
+    located_chapter = None
+    located_page = None
+    if request.image and request.book_id:
+        located = await locate_page(llm, request.image, request.media_type)
+        located_chapter = located.get("chapter")
+        located_page = located.get("page")
+
     if request.page_number:
         page_hint = f"（用户当前在阅读第 {request.page_number} 页）"
         user_text = f"{page_hint}\n{user_text}" if user_text else page_hint
+    elif located_page:
+        loc_hint = f"（看起来你在读第 {located_page} 页"
+        if located_chapter:
+            loc_hint += f" / {located_chapter}"
+        loc_hint += "）"
+        user_text = f"{loc_hint}\n{user_text}" if user_text else loc_hint
 
     context, _, _ = await asyncio.to_thread(
-        _retrieve_rag, rag, retrieval_text, request.book_id
+        _retrieve_rag, rag, retrieval_text, request.book_id,
+        located_chapter, located_page,
     )
     system_prompt = _build_system_prompt(context, detailed=False)
     full_prompt = f"{system_prompt}\n\n用户问题：{user_text or '请解释这张图片的内容'}"
@@ -151,20 +211,48 @@ async def chat_stream(
         for msg in request.history[-10:]
     ]
 
+    async def _plain_text_events():
+        """无 tool loop 时的纯文本事件流"""
+        stream = await llm.chat(
+            text=full_prompt,
+            image=request.image,
+            history=history,
+            stream=True,
+            media_type=request.media_type,
+        )
+        async for chunk in stream:
+            yield {"delta": chunk, "done": False}
+        yield {"delta": "", "done": True}
+
     async def generate():
         try:
-            stream = await llm.chat(
-                text=full_prompt,
-                image=request.image,
-                history=history,
-                stream=True,
-            )
+            from app.mcp.registry import should_use_tool_loop
+            from app.services.stream_tts import iter_with_sentence_tts
 
-            async for chunk in stream:
-                data = json.dumps({"delta": chunk, "done": False}, ensure_ascii=False)
-                yield f"data: {data}\n\n"
+            # Z4：可选服务端按句 TTS（需 DashScope key）
+            tts = None
+            if request.enable_tts and settings.dashscope_api_key:
+                try:
+                    from app.services.voice import get_tts_service
+                    tts = get_tts_service()
+                except Exception as e:
+                    print(f"⚠️ enable_tts 但 TTS 不可用，降级为纯文本流: {e}")
 
-            yield f"data: {json.dumps({'delta': '', 'done': True}, ensure_ascii=False)}\n\n"
+            if should_use_tool_loop():
+                from app.mcp.tool_loop import run_chat_with_tools_stream
+                upstream = run_chat_with_tools_stream(
+                    llm=llm,
+                    system_prompt=system_prompt,
+                    user_text=user_text or "请解释这张图片的内容",
+                    history=history,
+                    image=request.image,
+                    media_type=request.media_type,
+                )
+            else:
+                upstream = _plain_text_events()
+
+            async for event in iter_with_sentence_tts(upstream, tts):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"

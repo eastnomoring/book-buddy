@@ -17,8 +17,15 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Build outputs
-frontend/dist/
+dist/
 backend/dist/
+unpackage/
+# Rust / Tauri
+**/target/
+*.app
+*.dmg
+*.msi
+*.AppImage
 
 # Environment variables
 .env

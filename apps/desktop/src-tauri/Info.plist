@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Book Buddy 需要访问摄像头，用于拍摄书页并向 AI 提问。</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Book Buddy 需要访问麦克风，用于语音输入和朗读。</string>
+</dict>
+</plist>

@@ -3,8 +3,8 @@ import asyncio
 import base64
 import os
 import tempfile
-from typing import Optional
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from app.config import settings
 from app.services.llm import extract_text_content
@@ -142,22 +142,31 @@ class AliyunTTSService(TTSService):
 def get_asr_service() -> ASRService:
     """获取 ASR 服务实例"""
     provider = settings.asr_provider
-    
+
     if provider == "qwen":
         return QwenASRService()
     elif provider == "aliyun":
-        return AliyunASRService()
+        # 阿里云实现仍是占位桩，快速失败以免请求期才踩到 NotImplementedError
+        raise ValueError(
+            "阿里云 ASR 尚未实现（AliyunASRService 为占位桩）。"
+            "当前可用的 asr_provider: qwen（DashScope qwen3-asr-flash）。"
+            "请将 ASR_PROVIDER 改为 qwen，或先实现阿里云接入。"
+        )
     else:
-        raise ValueError(f"不支持的 ASR 提供商: {provider}")
+        raise ValueError(f"不支持的 ASR 提供商: {provider}。可选: qwen")
 
 
 def get_tts_service() -> TTSService:
     """获取 TTS 服务实例"""
     provider = settings.tts_provider
-    
+
     if provider == "qwen":
         return QwenTTSService()
     elif provider == "aliyun":
-        return AliyunTTSService()
+        raise ValueError(
+            "阿里云 TTS 尚未实现（AliyunTTSService 为占位桩）。"
+            "当前可用的 tts_provider: qwen（DashScope cosyvoice-v2）。"
+            "请将 TTS_PROVIDER 改为 qwen，或先实现阿里云接入。"
+        )
     else:
-        raise ValueError(f"不支持的 TTS 提供商: {provider}")
+        raise ValueError(f"不支持的 TTS 提供商: {provider}。可选: qwen")

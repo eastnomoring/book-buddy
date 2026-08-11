@@ -80,6 +80,23 @@ def test_asr_requires_key(monkeypatch):
         QwenASRService()
 
 
+def test_aliyun_asr_fails_fast(monkeypatch):
+    """provider=aliyun：工厂立即报带指引的 ValueError，而非请求期 NotImplementedError"""
+    from app.services import voice as voice_service
+
+    monkeypatch.setattr(settings, "asr_provider", "aliyun")
+    with pytest.raises(ValueError, match="尚未实现.*qwen"):
+        voice_service.get_asr_service()
+
+
+def test_aliyun_tts_fails_fast(monkeypatch):
+    from app.services import voice as voice_service
+
+    monkeypatch.setattr(settings, "tts_provider", "aliyun")
+    with pytest.raises(ValueError, match="尚未实现.*qwen"):
+        voice_service.get_tts_service()
+
+
 class _FakeSynthesizer:
     def __init__(self, model, voice):
         self.model = model
@@ -127,6 +144,7 @@ def test_tts_empty_text():
 def test_config_put_voice_key_keeps_provider(monkeypatch):
     """PUT /config 带 voice_api_key：写 DASHSCOPE_API_KEY，LLM provider 不变"""
     from fastapi.testclient import TestClient
+
     import app.routers.config as config_router
     from main import app
 

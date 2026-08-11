@@ -13,6 +13,17 @@
     "start": "node scripts/start.mjs",
     "start:dev": "node scripts/start.mjs --dev",
     "start:desktop": "node scripts/start.mjs --desktop",
-    "test": "pnpm --filter @book-buddy/core test && cd backend && .venv/bin/python -m pytest tests/ -q"
+    "test": "pnpm --filter @book-buddy/core test && cd backend && .venv/bin/python -m pytest tests/ -q",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write --cache .",
+    "type-check": "pnpm --filter @book-buddy/mp run type-check && pnpm --filter @book-buddy/web exec vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "eslint": "^10.8.0",
+    "eslint-plugin-vue": "^10.10.0",
+    "prettier": "^3.9.6"
   }
 }

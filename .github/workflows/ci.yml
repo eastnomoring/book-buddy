@@ -29,6 +29,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # 与本地 backend/pyproject.toml 配套的 ruff 版本保持一致，避免规则漂移
+          pip install ruff==0.16.1
+
+      - name: Ruff check
+        run: ruff check .
 
       - name: Run pytest
         env:
@@ -60,14 +65,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint (ESLint)
+        run: pnpm lint
+
       - name: Build core
         run: pnpm --filter @book-buddy/core build
 
       - name: Run core tests
         run: pnpm --filter @book-buddy/core test
 
-      - name: Build web
+      - name: Type-check web + build
         run: pnpm --filter @book-buddy/web build
+
+      # uni build 不做类型检查，type-check 须单独设卡，防止类型错误被构建掩盖
+      - name: Type-check mp
+        run: pnpm --filter @book-buddy/mp run type-check
 
       - name: Build mp-weixin
         run: pnpm --filter @book-buddy/mp build:mp-weixin

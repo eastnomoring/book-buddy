@@ -18,13 +18,13 @@ python main.py
 
 ## 环境变量
 
-创建 `.env` 文件：
+复制 `.env.example` 为 `.env` 并按注释填写（LLM/语音/RAG/鉴权等完整配置项见该文件）：
 
+```bash
+cp .env.example .env
 ```
-DASHSCOPE_API_KEY=your_qwen_api_key
-# 或
-DEEPSEEK_API_KEY=your_deepseek_api_key
-```
+
+注意：部署到非本机环境时务必设置 `AUTH_TOKEN`，否则所有 `/api/*` 接口完全开放。
 
 ## 目录说明
 

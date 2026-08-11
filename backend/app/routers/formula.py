@@ -6,6 +6,9 @@ from app.services.formula import formula_renderer
 
 router = APIRouter()
 
+# LaTeX 长度上限：防超长输入拖垮 mathtext 渲染（CPU/内存密集）
+MAX_LATEX_LENGTH = 800
+
 
 @router.get("/render/formula")
 async def render_formula(
@@ -21,6 +24,11 @@ async def render_formula(
     示例：
         GET /api/render/formula?latex=E[X]=\\int xf(x)dx&format=svg
     """
+    if len(latex) > MAX_LATEX_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"公式过长（{len(latex)} 字符，上限 {MAX_LATEX_LENGTH}）",
+        )
     if format not in ("svg", "png"):
         raise HTTPException(status_code=400, detail="format 只支持 svg 或 png")
 

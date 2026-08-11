@@ -54,3 +54,34 @@ def test_render_chinese_text_in_formula():
     """公式里允许中文（用于注释性公式）"""
     data, _ = formula_renderer.render(r"P(A) = 概率", "svg")
     assert b"</svg>" in data
+
+
+def test_render_route_rejects_overlong_latex():
+    """GET /api/render/formula 对超长 latex 返回 400（防拖垮 mathtext）"""
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    client = TestClient(app)
+    resp = client.get(
+        "/api/render/formula",
+        params={"latex": "x" * 801, "format": "svg"},
+    )
+    assert resp.status_code == 400
+    assert "过长" in resp.json()["detail"]
+
+
+def test_render_route_accepts_latex_at_limit():
+    """恰好达到长度上限（800）的 latex 不被长度门拦截（由后续 format 校验证明已通过）"""
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    client = TestClient(app)
+    resp = client.get(
+        "/api/render/formula",
+        params={"latex": "x" * 800, "format": "gif"},  # 非法 format
+    )
+    # 命中的是 format 校验而非长度校验 → 说明长度门已放行
+    assert resp.status_code == 400
+    assert "format" in resp.json()["detail"]

@@ -9,7 +9,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { SSEParser, type SSEEvent } from '../src/sse.js'
+import { SSEParser } from '../src/sse.js'
 
 test('单帧：单个 data: 行解析为 delta', () => {
   const p = new SSEParser()

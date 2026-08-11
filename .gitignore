@@ -48,6 +48,8 @@ backend/data/books/*.pdf
 backend/data/books/*.json
 backend/data/*.db
 backend/data/chroma/
+# 笔记工具运行时产物（写在仓库根目录，见 backend/app/mcp/notes.py）
+data/notes/
 
 # Logs
 *.log

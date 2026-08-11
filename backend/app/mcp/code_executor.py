@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Optional
 
 # 安全参数
 TIMEOUT_SECONDS = 10
@@ -38,6 +37,32 @@ class _BlockedSocket(_orig_socket):
         raise PermissionError("网络访问已被沙箱禁用")
 _sock.socket = _BlockedSocket
 """
+
+
+def _build_preexec_fn():
+    """构造子进程 preexec_fn：POSIX 下用 setrlimit 施加内存上限。
+
+    - Windows 无 resource 模块 → 返回 None 降级（仅靠 timeout 兜底）
+    - macOS 内核拒绝有限的 RLIMIT_AS（只允许 RLIM_INFINITY）→ 子进程内
+      捕获异常降级，不影响执行；Linux 上正常生效
+    """
+    if os.name != "posix":
+        return None
+    try:
+        import resource
+    except ImportError:
+        return None
+
+    def _apply_limits():
+        try:
+            resource.setrlimit(
+                resource.RLIMIT_AS,
+                (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES),
+            )
+        except (ValueError, OSError):
+            pass  # 平台不支持调低 RLIMIT_AS：降级为仅靠超时兜底
+
+    return _apply_limits
 
 
 class ExecutionResult:
@@ -87,6 +112,7 @@ def run_python(code: str, timeout: int = TIMEOUT_SECONDS) -> ExecutionResult:
             capture_output=True,
             timeout=timeout,
             cwd=work_dir,
+            preexec_fn=_build_preexec_fn(),
             env={
                 # 最小环境变量，不继承敏感信息
                 "PATH": os.environ.get("PATH", "/usr/bin:/bin"),

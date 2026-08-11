@@ -7,10 +7,12 @@
 GLM-4.6V 的 Function Calling 用 OpenAI tools 协议：
 LLM 返回 tool_calls → 后端执行 → 结果作为 tool 角色消息回注 → LLM 继续。
 """
-import json
-from typing import Any, Callable, Optional
+import logging
+from typing import Any, Callable
 
-from app.mcp.code_executor import run_python, ExecutionResult
+from app.mcp.code_executor import ExecutionResult, run_python
+
+logger = logging.getLogger(__name__)
 
 
 # ============ 工具注册 ============
@@ -137,9 +139,24 @@ def get_active_openai_tools() -> list[dict]:
     ]
 
 
-def should_use_tool_loop() -> bool:
-    """有任一活跃工具时走 tool loop（不再只看 MCP_CODE_ENABLED）。"""
-    return bool(get_active_openai_tools())
+def should_use_tool_loop(llm: Any = None) -> bool:
+    """有任一活跃工具时走 tool loop（不再只看 MCP_CODE_ENABLED）。
+
+    传入 llm 时额外检查其工具调用能力：tool loop 依赖 OpenAI tools 协议
+    方法（chat_with_tools / stream_with_tools），目前仅 OpenAICompatibleService
+    实现。qwen 等不支持的 provider 记 warning 并回退普通对话，保证聊天可用。
+    """
+    if not get_active_openai_tools():
+        return False
+    if llm is not None and not (
+        hasattr(llm, "chat_with_tools") and hasattr(llm, "stream_with_tools")
+    ):
+        logger.warning(
+            "当前 LLM 服务（%s）不支持工具调用，已注册的工具本次不生效，回退普通对话",
+            type(llm).__name__,
+        )
+        return False
+    return True
 
 
 # 开发/测试便利：模块导入时预注册 run_python（生产仍由配置决定是否暴露）

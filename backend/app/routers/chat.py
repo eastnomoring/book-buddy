@@ -1,18 +1,22 @@
 """对话路由"""
 import asyncio
 import json
-from fastapi import APIRouter, HTTPException, Depends
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.config import settings
 from app.models.chat import (
     ChatRequest,
     ChatResponse,
 )
-from app.services.llm import get_llm_service, LLMService
-from app.services.rag import rag_service, RAGService
-from app.services.voice import get_asr_service, ASRService
+from app.services.llm import LLMService, get_llm_service
 from app.services.page_locator import locate_page
-from app.config import settings
+from app.services.rag import RAGService, rag_service
+from app.services.voice import ASRService, get_asr_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -67,7 +71,7 @@ def _retrieve_rag(
         sources = [s["content"][:200] for s in sources_data]
         page_refs = [s["page"] for s in sources_data]
     except Exception as e:
-        print(f"RAG 检索失败: {e}")
+        logger.warning("RAG 检索失败: %s", e)
 
     return context, sources, page_refs
 
@@ -130,9 +134,9 @@ async def chat(
     try:
         full_prompt = f"{system_prompt}\n\n用户问题：{user_text or '请解释这张图片的内容'}"
 
-        # 任一活跃 MCP 工具（代码执行 / Anki / 笔记）时走 tool loop
+        # 任一活跃 MCP 工具（代码执行 / Anki / 笔记）且 LLM 支持工具调用时走 tool loop
         from app.mcp.registry import should_use_tool_loop
-        if should_use_tool_loop():
+        if should_use_tool_loop(llm):
             from app.mcp.tool_loop import run_chat_with_tools
             response_text = await run_chat_with_tools(
                 llm=llm,
@@ -236,9 +240,9 @@ async def chat_stream(
                     from app.services.voice import get_tts_service
                     tts = get_tts_service()
                 except Exception as e:
-                    print(f"⚠️ enable_tts 但 TTS 不可用，降级为纯文本流: {e}")
+                    logger.warning("⚠️ enable_tts 但 TTS 不可用，降级为纯文本流: %s", e)
 
-            if should_use_tool_loop():
+            if should_use_tool_loop(llm):
                 from app.mcp.tool_loop import run_chat_with_tools_stream
                 upstream = run_chat_with_tools_stream(
                     llm=llm,

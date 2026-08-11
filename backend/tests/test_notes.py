@@ -1,14 +1,15 @@
 """笔记工具 + 活跃工具门控测试（Z2 收尾 / Z3 笔记部分）"""
+import logging
+
 import pytest
-from pathlib import Path
 
 from app.config import settings
-from app.mcp.notes import _save_note, register_note_tool, NOTES_DIR
+from app.mcp.notes import _save_note, register_note_tool
 from app.mcp.registry import (
-    registry,
     get_active_openai_tools,
-    should_use_tool_loop,
     register_code_tool,
+    registry,
+    should_use_tool_loop,
 )
 
 
@@ -74,3 +75,31 @@ def test_active_tools_gate_code_on(monkeypatch):
     # 清掉可能已有的 save_note：直接看 code 是否出现
     names = [t["function"]["name"] for t in get_active_openai_tools()]
     assert "run_python" in names
+
+
+def test_tool_loop_gated_by_llm_capability(monkeypatch, caplog):
+    """有活跃工具但 LLM 无 chat_with_tools（如 qwen）时记 warning 并回退普通对话"""
+    monkeypatch.setattr(settings, "mcp_code_enabled", False)
+    monkeypatch.setattr(settings, "anki_enabled", False)
+    monkeypatch.setattr(settings, "notes_enabled", True)
+    register_note_tool()
+
+    class _NoToolsLLM:
+        pass
+
+    with caplog.at_level(logging.WARNING, logger="app.mcp.registry"):
+        assert should_use_tool_loop(_NoToolsLLM()) is False
+    assert "不支持工具调用" in caplog.text
+
+
+def test_tool_loop_allowed_for_capable_llm(monkeypatch):
+    """OpenAICompatibleService 实现了工具调用方法，有活跃工具时走 tool loop"""
+    from app.services.llm import OpenAICompatibleService
+
+    monkeypatch.setattr(settings, "mcp_code_enabled", False)
+    monkeypatch.setattr(settings, "anki_enabled", False)
+    monkeypatch.setattr(settings, "notes_enabled", True)
+    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    register_note_tool()
+
+    assert should_use_tool_loop(OpenAICompatibleService()) is True

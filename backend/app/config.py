@@ -1,6 +1,6 @@
 """应用配置管理"""
-import os
 from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,11 +56,9 @@ class Settings(BaseSettings):
     # 本地笔记沉淀（零依赖 markdown；默认开启，测试可关以免强制走 tool loop）
     notes_enabled: bool = True
 
+    # 书籍上传大小上限（MB），超出返回 413
+    max_upload_mb: int = 50
+
 
 # 全局配置实例
 settings = Settings()
-
-
-def get_settings() -> Settings:
-    """获取配置实例"""
-    return settings

@@ -1,23 +1,30 @@
 """书籍管理路由"""
-import json
+import logging
 import os
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks, Form
 
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+
+from app.config import settings
 from app.models.chat import (
     BookInfo,
-    BookUploadResponse,
     BookSearchRequest,
     BookSearchResult,
+    BookUploadResponse,
 )
 from app.services.rag import rag_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # 书籍存储目录
 BOOKS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "books")
 BOOKS_DIR = os.path.abspath(BOOKS_DIR)
+
+# 上传分块大小（1MB）：边读边写，超限即中断，不整文件入内存
+UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
 def _meta_path(book_id: str) -> str:
@@ -40,7 +47,7 @@ def _load_meta(book_id: str) -> Optional[BookInfo]:
         with open(path, "r", encoding="utf-8") as f:
             return BookInfo.model_validate_json(f.read())
     except Exception as e:
-        print(f"读取书籍元信息失败 [{book_id}]: {e}")
+        logger.warning("读取书籍元信息失败 [%s]: %s", book_id, e)
         return None
 
 
@@ -98,12 +105,27 @@ async def upload_book(
 
     file_path = os.path.join(BOOKS_DIR, f"{book_id}.pdf")
 
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="上传文件为空")
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    written = 0
+    try:
+        with open(file_path, "wb") as f:
+            while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+                written += len(chunk)
+                if written > max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"文件超过大小限制（最大 {settings.max_upload_mb}MB）",
+                    )
+                f.write(chunk)
+    except Exception:
+        # 清理不完整的上传产物
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
 
-    with open(file_path, "wb") as f:
-        f.write(content)
+    if written == 0:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="上传文件为空")
 
     book_title = title or file.filename
     book_info = BookInfo(
@@ -122,7 +144,7 @@ async def upload_book(
                 books_db[book_id].total_pages = result["pages"]
                 _save_meta(books_db[book_id])
         except Exception as e:
-            print(f"书籍解析失败 [{book_id}]: {e}")
+            logger.warning("书籍解析失败 [%s]: %s", book_id, e)
             if book_id in books_db:
                 # 保留记录但页数为 -1 表示解析失败
                 books_db[book_id].total_pages = -1

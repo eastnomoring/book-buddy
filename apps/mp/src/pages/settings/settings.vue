@@ -12,7 +12,7 @@ onMounted(async () => {
   loading.value = true
   try {
     config.value = await getConfig()
-  } catch (e) {
+  } catch {
     message.value = '获取后端配置失败，请检查 baseURL'
   } finally {
     loading.value = false

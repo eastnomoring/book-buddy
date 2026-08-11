@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { MpChatTransport, type ToolEvent } from '../../platform/chatTransport'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { MpChatTransport } from '../../platform/chatTransport'
 import { listBooks, uploadBook } from '../../platform/books'
 import { getApiBase, getConfig } from '../../platform/config'
 import { readFileBase64, writeToolImage } from '../../platform/fs'
-import { MpAudioRecorder } from '../../platform/audioRecorder'
 import { MpTTSPlayer } from '../../platform/ttsPlayer'
-import { transcribeVoice } from '../../platform/voice'
-import { contentToNodes } from '../../utils/formula'
+import { useVoiceInput } from './useVoiceInput'
 import CameraCapture from '../../components/CameraCapture.vue'
+import ChatTopBar from '../../components/ChatTopBar.vue'
+import MessageList from '../../components/MessageList.vue'
+import ChatComposer from '../../components/ChatComposer.vue'
+import type { UiMessage } from '../../types'
 import type {
   ChatMessage,
   BookInfo,
@@ -16,15 +18,7 @@ import type {
   ChatStreamHandle,
 } from '@book-buddy/core'
 
-/** 展示层消息：附加工具事件与落盘后的图片路径 */
-interface UiMessage extends ChatMessage {
-  toolEvents?: ToolEvent[]
-  /** tool_result.images 落盘后的本地路径，按 tool id 索引 */
-  toolImagePaths?: Record<string, string[]>
-}
-
 const chatTransport = new MpChatTransport()
-const recorder = new MpAudioRecorder()
 const ttsPlayer = ref(new MpTTSPlayer(false))
 let currentHandle: ChatStreamHandle | null = null
 
@@ -36,26 +30,10 @@ const books = ref<BookInfo[]>([])
 const currentBookId = ref<string | null>(null)
 const showCamera = ref(false)
 const pendingImage = ref<PhotoResult | null>(null)
-const isRecording = ref(false)
-const isTranscribing = ref(false)
 const voiceConfigured = ref(false)
 const speakerOn = ref(true)
 
-const currentBookTitle = computed(() => {
-  const book = books.value.find((b) => b.id === currentBookId.value)
-  return book?.title || '选择书籍'
-})
-
-const pickerIndex = computed(() => {
-  const idx = books.value.findIndex((b) => b.id === currentBookId.value)
-  return idx < 0 ? 0 : idx
-})
-
-const lastMessageId = computed(() => {
-  if (loading.value) return 'msg-loading'
-  const len = messages.value.length
-  return len ? `msg-${len - 1}` : ''
-})
+const { isRecording, isTranscribing, toggleRecord } = useVoiceInput({ inputText, error })
 
 onMounted(() => {
   loadBooks()
@@ -90,10 +68,8 @@ async function loadConfig() {
   }
 }
 
-function onBookChange(e: UniPickerChangeEvent) {
-  const index = e.detail.value as number
-  const book = books.value[index]
-  if (book) currentBookId.value = book.id
+function onBookChange(id: string) {
+  currentBookId.value = id
 }
 
 function openSettings() {
@@ -146,38 +122,9 @@ function removePendingImage() {
   pendingImage.value = null
 }
 
-async function toggleRecord() {
-  if (isRecording.value) {
-    isRecording.value = false
-    isTranscribing.value = true
-    try {
-      const result = await recorder.stop()
-      const transcription = await transcribeVoice(
-        result.base64,
-        result.mimeType.split('/')[1],
-      )
-      const text = transcription.text.trim()
-      if (text) {
-        inputText.value = text
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '语音识别失败'
-    } finally {
-      isTranscribing.value = false
-    }
-  } else {
-    error.value = ''
-    try {
-      await recorder.start()
-      isRecording.value = true
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '无法启动录音'
-    }
-  }
-}
-
 function chooseBookFile() {
   wx.chooseMessageFile({
+    count: 1,
     type: 'file',
     extension: ['pdf'],
     success: async (res) => {
@@ -199,7 +146,7 @@ function chooseBookFile() {
       if (err.errMsg?.includes('cancel')) return
       error.value = err.errMsg || '选择文件失败'
     },
-  } as any)
+  })
 }
 
 function sendMessage() {
@@ -331,122 +278,24 @@ function playLastAnswer() {
 
 <template>
   <view class="page">
-    <view class="top-bar">
-      <picker
-        v-if="books.length"
-        mode="selector"
-        :range="books"
-        range-key="title"
-        :value="pickerIndex"
-        @change="onBookChange"
-      >
-        <view class="book-picker">
-          <text class="book-label">当前书籍</text>
-          <text class="book-title">{{ currentBookTitle }}</text>
-        </view>
-      </picker>
-      <view v-else class="book-picker">
-        <text class="book-label">当前书籍</text>
-        <text class="book-title">未加载</text>
-      </view>
+    <ChatTopBar
+      :books="books"
+      :book-id="currentBookId"
+      :speaker-on="speakerOn"
+      :voice-configured="voiceConfigured"
+      @book-change="onBookChange"
+      @upload="chooseBookFile"
+      @toggle-speaker="toggleSpeaker"
+      @settings="openSettings"
+    />
 
-      <view class="top-actions">
-        <view class="icon-btn upload" @click="chooseBookFile">上传</view>
-        <view
-          class="icon-btn speaker"
-          :class="{ muted: !speakerOn || !voiceConfigured }"
-          @click="toggleSpeaker"
-        >
-          {{ speakerOn && voiceConfigured ? '朗读开' : '朗读关' }}
-        </view>
-        <view class="icon-btn settings" @click="openSettings">设置</view>
-      </view>
-    </view>
-
-    <scroll-view
-      class="messages"
-      scroll-y
-      :scroll-into-view="lastMessageId"
-      scroll-with-animation
-    >
-      <view v-if="messages.length === 0" class="empty">
-        <text class="empty-title">从一页书开始</text>
-        <text class="empty-copy">拍照、选图、录音或输入问题。</text>
-      </view>
-
-      <view
-        v-for="(msg, idx) in messages"
-        :id="`msg-${idx}`"
-        :key="idx"
-        class="bubble"
-        :class="msg.role"
-      >
-        <view class="bubble-inner">
-          <view class="bubble-header">
-            <text class="bubble-label">{{ msg.role === 'user' ? '你' : '伴读' }}</text>
-            <text
-              v-if="msg.role === 'assistant' && voiceConfigured"
-              class="play-btn"
-              @click="playLastAnswer"
-            >
-              朗读
-            </text>
-          </view>
-          <view v-if="msg.toolEvents?.length" class="tool-events">
-            <view
-              v-for="ev in msg.toolEvents"
-              :key="ev.id"
-              class="tool-event"
-              :class="{
-                running: ev.type === 'tool_call',
-                failed: ev.type === 'tool_result' && !ev.ok,
-              }"
-            >
-              <view class="tool-head">
-                <text class="tool-name">{{ ev.name }}</text>
-                <text class="tool-status">
-                  {{ ev.type === 'tool_call' ? '运行中…' : ev.ok ? '完成' : '失败' }}
-                </text>
-              </view>
-              <text
-                v-if="ev.type === 'tool_result' && ev.preview"
-                class="tool-preview"
-              >{{ ev.preview }}</text>
-              <view
-                v-if="msg.toolImagePaths?.[ev.id]?.length"
-                class="tool-images"
-              >
-                <image
-                  v-for="(src, imgIdx) in msg.toolImagePaths[ev.id]"
-                  :key="`${ev.id}-${imgIdx}`"
-                  class="tool-image"
-                  :src="src"
-                  mode="widthFix"
-                />
-              </view>
-            </view>
-          </view>
-          <!-- P4：公式经后端 /render/formula 渲染为图片，其余文本原样展示 -->
-          <rich-text
-            class="bubble-body"
-            :nodes="msg.role === 'assistant' ? contentToNodes(msg.content) : [{ type: 'text', text: msg.content }]"
-          />
-        </view>
-      </view>
-
-      <view v-if="loading" id="msg-loading" class="bubble assistant">
-        <view class="bubble-inner">
-          <text class="bubble-label">伴读</text>
-          <view class="typing">
-            <text></text>
-            <text></text>
-            <text></text>
-          </view>
-        </view>
-      </view>
-
-      <view v-if="error" class="error-banner">{{ error }}</view>
-    </scroll-view>
+    <MessageList
+      :messages="messages"
+      :loading="loading"
+      :error="error"
+      :voice-configured="voiceConfigured"
+      @play="playLastAnswer"
+    />
 
     <view v-if="pendingImage" class="pending-image">
       <image
@@ -458,31 +307,17 @@ function playLastAnswer() {
       <text class="pending-remove" @click="removePendingImage">移除</text>
     </view>
 
-    <view class="composer">
-      <view class="icon-btn camera" @click="toggleCamera">拍照</view>
-      <view class="icon-btn album" @click="chooseFromAlbum">相册</view>
-      <view
-        class="icon-btn record"
-        :class="{ recording: isRecording }"
-        @click="toggleRecord"
-      >
-        {{ isRecording ? '结束' : isTranscribing ? '识别' : '录音' }}
-      </view>
-      <input
-        v-model="inputText"
-        class="composer-input"
-        placeholder="这一页哪里卡住了？"
-        confirm-type="send"
-        @confirm="sendMessage"
-      />
-      <button
-        class="send-btn"
-        :disabled="loading || (!inputText.trim() && !pendingImage)"
-        @click="sendMessage"
-      >
-        发送
-      </button>
-    </view>
+    <ChatComposer
+      v-model="inputText"
+      :loading="loading"
+      :pending-image="pendingImage"
+      :is-recording="isRecording"
+      :is-transcribing="isTranscribing"
+      @camera="toggleCamera"
+      @album="chooseFromAlbum"
+      @record="toggleRecord"
+      @send="sendMessage"
+    />
 
     <CameraCapture
       v-if="showCamera"
@@ -499,268 +334,6 @@ function playLastAnswer() {
   height: 100vh;
   background: linear-gradient(165deg, #f4f7f8 0%, #eef2f4 42%, #e2e8ec 100%);
   color: #152028;
-}
-
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.6rem 0.8rem;
-  border-bottom: 1px solid rgba(21, 32, 40, 0.1);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.book-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.book-label {
-  font-size: 0.58rem;
-  color: #6b7884;
-  letter-spacing: 0.04em;
-}
-
-.book-title {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #152028;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.top-actions {
-  display: flex;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-
-.icon-btn {
-  font-size: 0.7rem;
-  color: #1a6b5c;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid rgba(26, 107, 92, 0.25);
-  border-radius: 8px;
-  background: rgba(26, 107, 92, 0.08);
-  white-space: nowrap;
-}
-
-.icon-btn.muted {
-  color: #6b7884;
-  border-color: rgba(21, 32, 40, 0.15);
-  background: rgba(21, 32, 40, 0.05);
-}
-
-.icon-btn.recording {
-  color: #b42318;
-  border-color: rgba(180, 35, 24, 0.3);
-  background: rgba(180, 35, 24, 0.1);
-}
-
-.messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.6rem 0.8rem;
-}
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-top: 30vh;
-  text-align: center;
-}
-
-.empty-title {
-  font-size: 1.15rem;
-  font-weight: 500;
-  color: #1a6b5c;
-  margin-bottom: 0.3rem;
-}
-
-.empty-copy {
-  font-size: 0.78rem;
-  color: #6b7884;
-}
-
-.bubble {
-  display: flex;
-  margin-bottom: 0.75rem;
-}
-
-.bubble.user {
-  justify-content: flex-end;
-}
-
-.bubble-inner {
-  max-width: 85%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.bubble-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin: 0 0.25rem;
-}
-
-.bubble-label {
-  font-size: 0.58rem;
-  color: #6b7884;
-}
-
-.play-btn {
-  font-size: 0.58rem;
-  color: #1a6b5c;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  background: rgba(26, 107, 92, 0.1);
-}
-
-.bubble-body {
-  padding: 0.6rem 0.8rem;
-  border-radius: 12px;
-  line-height: 1.55;
-  font-size: 0.9rem;
-  word-break: break-word;
-}
-
-.bubble.user .bubble-body {
-  background: #152028;
-  color: #f4f7f8;
-  border-bottom-right-radius: 4px;
-}
-
-.bubble.assistant .bubble-body {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(21, 32, 40, 0.1);
-  border-bottom-left-radius: 4px;
-}
-
-.tool-events {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.25rem;
-}
-
-.tool-event {
-  padding: 0.4rem 0.55rem;
-  border: 1px solid rgba(26, 107, 92, 0.2);
-  border-radius: 10px;
-  background: rgba(26, 107, 92, 0.06);
-}
-
-.tool-event.failed {
-  border-color: rgba(180, 35, 24, 0.3);
-  background: rgba(180, 35, 24, 0.06);
-}
-
-.tool-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-
-.tool-name {
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: #1a6b5c;
-}
-
-.tool-event.failed .tool-name {
-  color: #b42318;
-}
-
-.tool-status {
-  font-size: 0.65rem;
-  color: #6b7884;
-}
-
-.tool-preview {
-  display: block;
-  margin-top: 0.3rem;
-  padding: 0.35rem 0.4rem;
-  border-radius: 6px;
-  background: rgba(21, 32, 40, 0.05);
-  font-size: 0.65rem;
-  line-height: 1.45;
-  color: #3d4a55;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 8rem;
-  overflow-y: auto;
-}
-
-.tool-images {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.35rem;
-}
-
-.tool-image {
-  width: 100%;
-  border-radius: 8px;
-  border: 1px solid rgba(21, 32, 40, 0.1);
-  background: #fff;
-}
-
-.typing {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0.7rem 0.8rem;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(21, 32, 40, 0.1);
-  border-radius: 12px;
-  border-bottom-left-radius: 4px;
-}
-
-.typing text {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #1a6b5c;
-  animation: typing-dot 1.2s ease-in-out infinite;
-}
-
-.typing text:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typing text:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-@keyframes typing-dot {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-3px);
-  }
-}
-
-.error-banner {
-  margin: 0.5rem 0;
-  padding: 0.5rem 0.7rem;
-  border-radius: 8px;
-  background: rgba(180, 35, 24, 0.1);
-  color: #b42318;
-  font-size: 0.78rem;
 }
 
 .pending-image {
@@ -791,39 +364,5 @@ function playLastAnswer() {
   font-size: 0.72rem;
   color: #b42318;
   padding: 0.15rem 0.4rem;
-}
-
-.composer {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-  padding: 0.55rem 0.7rem calc(0.55rem + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(21, 32, 40, 0.1);
-  background: rgba(255, 255, 255, 0.85);
-}
-
-.composer-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid rgba(21, 32, 40, 0.12);
-  border-radius: 10px;
-  background: #fff;
-  font-size: 0.85rem;
-}
-
-.send-btn {
-  flex-shrink: 0;
-  padding: 0.5rem 0.85rem;
-  border-radius: 10px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #f7fffc;
-  background: linear-gradient(135deg, #22907b 0%, #1a6b5c 55%, #145447 100%);
-  box-shadow: 0 2px 6px rgba(26, 107, 92, 0.25);
-}
-
-.send-btn[disabled] {
-  opacity: 0.45;
 }
 </style>

@@ -4,11 +4,13 @@ export function spokenText(sentence: string): string {
     .replace(/\$\$[\s\S]+?\$\$/g, '，公式，')
     .replace(/\$[^\n$]+?\$/g, '公式')
     .replace(/```[\s\S]*?```/g, '，代码片段，')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '，图片，')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[*`#>]/g, '')
     .trim()
 }
 
-/** 把 LLM 增量文本切成完整句子（句读点：。!?!；;\n） */
+/** 把 LLM 增量文本切成完整句子（句读点：。！？!?；;\n） */
 export class SentenceStreamer {
   private buffer = ''
 
@@ -33,7 +35,7 @@ export class SentenceStreamer {
   }
 
   private findSentenceEnd(): number {
-    const match = /[。!?!；;\n]/.exec(this.buffer)
+    const match = /[。！？!?；;\n]/.exec(this.buffer)
     return match ? match.index : -1
   }
 }

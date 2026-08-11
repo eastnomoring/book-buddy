@@ -2,7 +2,6 @@
 import re
 from typing import List
 
-
 _SENTENCE_END = re.compile(r"[。！？!？；;\n]")
 
 
@@ -12,6 +11,8 @@ def spoken_text(sentence: str) -> str:
     text = re.sub(r"\$\$[\s\S]+?\$\$", "，公式，", text)
     text = re.sub(r"\$[^\n$]+?\$", "公式", text)
     text = re.sub(r"```[\s\S]*?```", "，代码片段，", text)
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "，图片，", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"[*`#>]", "", text)
     return text.strip()
 

@@ -8,6 +8,7 @@ import {
   buildChatBody,
   API_PATHS,
   PlatformError,
+  SSEParser,
   type ChatRequest,
   type ChatStreamCallbacks,
   type ChatStreamHandle,
@@ -39,11 +40,15 @@ const API_BASE = '/api'
 /**
  * Web 端流式对话：fetch + ReadableStream + core SSEParser。
  * 把现有 streamChat 的 generator 逻辑包装为回调式 ChatTransport。
+ * 帧解析复用 @book-buddy/core 的 SSEParser（按 \n\n 切帧），与小程序端行为一致；
+ * abort 通过 AbortController 真正取消 fetch，中止后不再触发任何回调。
  */
 class WebChatTransportImpl {
   chatStream(req: ChatRequest, cb: ToolAwareCallbacks): ChatStreamHandle {
     let aborted = false
+    const controller = new AbortController()
     const decoder = new TextDecoder()
+    const parser = new SSEParser()
 
     const run = async () => {
       try {
@@ -51,6 +56,7 @@ class WebChatTransportImpl {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buildChatBody(req)),
+          signal: controller.signal,
         })
 
         if (!response.ok) {
@@ -64,49 +70,39 @@ class WebChatTransportImpl {
           return
         }
 
-        let buffer = ''
         while (true) {
           if (aborted) return
           const { done, value } = await reader.read()
           if (done) break
 
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const ev = JSON.parse(line.slice(6))
-              if (ev.error) {
-                cb.onError(new PlatformError(String(ev.error)))
-                return
-              }
-              // T1：工具事件带 type，透传给展示层
-              if (ev.type === 'tool_call' || ev.type === 'tool_result') {
-                cb.onToolEvent?.(ev as ToolEvent)
-                continue
-              }
-              // Z4：服务端 TTS 音频
-              if (ev.type === 'audio') {
-                cb.onAudioEvent?.(ev as SSEAudioEvent)
-                continue
-              }
-              if (ev.delta) cb.onChunk(ev.delta)
-              if (ev.done) {
-                cb.onDone()
-                return
-              }
-            } catch {
+          const events = parser.push(decoder.decode(value, { stream: true }))
+          for (const ev of events) {
+            if ('error' in ev && ev.error) {
+              cb.onError(new PlatformError(String(ev.error)))
+              return
+            }
+            // T1：工具事件带 type，透传给展示层
+            if ('type' in ev && (ev.type === 'tool_call' || ev.type === 'tool_result')) {
+              cb.onToolEvent?.(ev as ToolEvent)
               continue
+            }
+            // Z4：服务端 TTS 音频
+            if ('type' in ev && ev.type === 'audio') {
+              cb.onAudioEvent?.(ev as SSEAudioEvent)
+              continue
+            }
+            if ('delta' in ev && ev.delta) cb.onChunk(ev.delta)
+            if ('done' in ev && ev.done) {
+              cb.onDone()
+              return
             }
           }
         }
         cb.onDone()
       } catch (e) {
-        if (!aborted) {
-          cb.onError(new PlatformError('网络请求失败', e))
-        }
+        // 用户主动 abort：fetch/reader 抛 AbortError，静默收尾，不误报 onError
+        if (aborted || (e instanceof DOMException && e.name === 'AbortError')) return
+        cb.onError(new PlatformError('网络请求失败', e))
       }
     }
 
@@ -114,7 +110,9 @@ class WebChatTransportImpl {
 
     return {
       abort: () => {
+        if (aborted) return
         aborted = true
+        controller.abort()
       },
     }
   }

@@ -4,12 +4,10 @@
 「识别成功收窄 RAG」「识别失败降级整书 RAG」两条路径。
 VLM 与 RAG 全部 mock，不触网。
 """
-import json
 import pytest
 from fastapi.testclient import TestClient
 
 from app.services.page_locator import _extract_json
-
 
 # ============ _extract_json 容错测试 ============
 
@@ -39,11 +37,10 @@ def test_extract_json_invalid_returns_empty():
 @pytest.fixture
 def mock_app(monkeypatch):
     """构造带 mock LLM/RAG 的 app"""
-    from main import app
+    from app.config import settings
     from app.routers.chat import get_llm_service, get_rag_service
     from app.services.llm import LLMService
-    from app.services.page_locator import locate_page
-    from app.config import settings
+    from main import app
 
     monkeypatch.setattr(settings, "mcp_code_enabled", False)
     monkeypatch.setattr(settings, "anki_enabled", False)

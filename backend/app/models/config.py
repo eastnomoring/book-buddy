@@ -1,5 +1,6 @@
 """配置相关 Pydantic 模型"""
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 

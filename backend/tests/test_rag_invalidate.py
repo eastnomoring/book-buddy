@@ -1,11 +1,9 @@
 """VectorStore.invalidate 与书籍索引重建测试（不碰网络与真实向量库）"""
-import json
 
-import pytest
 
-from app.services.rag import VectorStore
-from app.routers.book import rebuild_books_index, books_db, _save_meta
 from app.models.chat import BookInfo
+from app.routers.book import _save_meta, books_db, rebuild_books_index
+from app.services.rag import VectorStore
 
 
 def test_invalidate_resets_state():

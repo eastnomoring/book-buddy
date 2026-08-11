@@ -11,7 +11,6 @@ import matplotlib
 matplotlib.use("Agg")  # 无头模式，必须在导入 pyplot 前设置
 import matplotlib.pyplot as plt
 
-
 Format = Literal["svg", "png"]
 
 

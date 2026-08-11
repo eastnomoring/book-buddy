@@ -7,6 +7,7 @@
 小程序端在 wx.request header 里带 Authorization。
 """
 import os
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 

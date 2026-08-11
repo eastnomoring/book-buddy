@@ -1,10 +1,13 @@
 """RAG 服务：书籍解析 + 向量检索"""
 import hashlib
+import logging
 import re
-from typing import List, Optional, Dict
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class BookParser:
@@ -285,7 +288,7 @@ class VectorStore:
                 where=where_filter,
             )
         except Exception as e:
-            print(f"向量检索失败: {e}")
+            logger.warning("向量检索失败: %s", e)
             return []
 
         documents = (results.get("documents") or [[]])[0]

@@ -5,7 +5,6 @@
 
 选型：本地文件写入，零依赖、可移植。搜索 MCP 另见 docs/SEARCH_MCP_SELECTION.md。
 """
-import os
 import re
 from datetime import datetime
 from pathlib import Path

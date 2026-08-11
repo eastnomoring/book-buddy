@@ -4,7 +4,6 @@ mock llm.stream_with_tools（对齐非流式 chat_with_tools 的测试做法）�
 验证事件序列：delta → tool_call → tool_result → delta → done。
 """
 import asyncio
-import json
 from types import SimpleNamespace
 
 import pytest

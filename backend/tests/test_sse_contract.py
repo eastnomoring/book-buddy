@@ -7,6 +7,7 @@
 任一方改动导致格式不一致时，必有一边测试红。
 """
 import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,10 +15,10 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client(monkeypatch):
     """构造一个 client，用 dependency_overrides 注入 fake LLM，避免真实网络调用"""
-    from main import app
+    from app.config import settings
     from app.routers.chat import get_llm_service, get_rag_service
     from app.services.llm import LLMService
-    from app.config import settings
+    from main import app
 
     # 契约测试走纯文本流，关掉所有 MCP 工具以免进入 tool loop
     monkeypatch.setattr(settings, "mcp_code_enabled", False)

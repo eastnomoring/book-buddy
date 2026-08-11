@@ -26,7 +26,7 @@ def test_update_env_file_uncomments_and_dedupes(tmp_path):
     path = tmp_path / ".env"
     path.write_text("# OPENAI_API_KEY=placeholder\nOPENAI_API_KEY=a\nOPENAI_API_KEY=b\n")
     update_env_file({"OPENAI_API_KEY": "final"}, path)
-    lines = [l for l in path.read_text().splitlines() if "OPENAI_API_KEY" in l]
+    lines = [line for line in path.read_text().splitlines() if "OPENAI_API_KEY" in line]
     assert lines == ["OPENAI_API_KEY=final"]
 
 

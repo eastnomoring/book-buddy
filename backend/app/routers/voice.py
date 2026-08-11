@@ -1,14 +1,15 @@
 """语音处理路由"""
 import time
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.chat import (
-    VoiceTranscribeRequest,
-    VoiceTranscribeResponse,
     VoiceSynthesizeRequest,
     VoiceSynthesizeResponse,
+    VoiceTranscribeRequest,
+    VoiceTranscribeResponse,
 )
-from app.services.voice import get_asr_service, get_tts_service, ASRService, TTSService
+from app.services.voice import ASRService, TTSService, get_asr_service, get_tts_service
 
 router = APIRouter()
 
@@ -40,7 +41,7 @@ async def transcribe_voice(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"语音识别失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"语音识别失败: {str(e)}") from e
 
 
 @router.post("/voice/synthesize", response_model=VoiceSynthesizeResponse)
@@ -68,4 +69,4 @@ async def synthesize_voice(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"语音合成失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"语音合成失败: {str(e)}") from e

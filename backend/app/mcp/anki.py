@@ -5,10 +5,11 @@
 
 用户侧前置：装 Anki + AnkiConnect 插件（码 2055492159），保持 Anki 开启。
 """
-import json
 from typing import Optional
 
 import httpx
+
+from app.mcp.registry import registry
 
 ANKI_CONNECT_URL = "http://localhost:8765"
 DEFAULT_DECK = "Book Buddy"
@@ -98,8 +99,6 @@ class AnkiConnectClient:
 
 
 # ============ MCP 工具注册 ============
-
-from app.mcp.registry import registry
 
 
 def _create_flashcard(

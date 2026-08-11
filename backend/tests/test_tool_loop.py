@@ -10,9 +10,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.config import settings
-from app.services.llm import OpenAICompatibleService
-from app.mcp.tool_loop import run_chat_with_tools
 from app.mcp.registry import registry
+from app.mcp.tool_loop import run_chat_with_tools
+from app.services.llm import OpenAICompatibleService
 
 
 @pytest.fixture(autouse=True)

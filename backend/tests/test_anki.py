@@ -3,8 +3,7 @@
 mock AnkiConnect HTTP 响应（httpx），不要求真装 Anki。
 覆盖：ping、ensure_deck/model、add_note、AnkiConnect 不可用降级。
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from app.mcp.anki import AnkiConnectClient, _create_flashcard, register_anki_tool
 from app.mcp.registry import registry

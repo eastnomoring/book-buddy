@@ -5,9 +5,8 @@
 
 注意：matplotlib 首次运行会构建字体缓存（~10s），测试用 30s 超时避免误判。
 """
-import pytest
 
-from app.mcp.code_executor import run_python, MAX_IMAGES
+from app.mcp.code_executor import MAX_IMAGES, run_python
 
 # 测试专用超时（matplotlib 字体缓存构建慢）
 TEST_TIMEOUT = 30
@@ -101,8 +100,8 @@ def test_image_count_capped():
 
 def test_tool_result_images_in_registry():
     """registry 调用 run_python 后返回 dict 带 images 字段（用简单图避免超时）"""
-    from app.mcp.registry import _format_exec_result
     from app.mcp.code_executor import ExecutionResult
+    from app.mcp.registry import _format_exec_result
 
     # 直接构造带图的结果，验证 _format_exec_result 输出格式
     result = ExecutionResult(

@@ -2,58 +2,60 @@
 Book Buddy Backend
 AI 伴读系统后端服务
 """
-import os
+import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    print("🚀 Book Buddy Backend 启动...")
+    logger.info("🚀 Book Buddy Backend 启动...")
     # 启动时从磁盘重建书籍索引（PDF 与向量数据已持久化）
     try:
         from app.routers.book import rebuild_books_index
         n = rebuild_books_index()
         if n:
-            print(f"📖 已恢复 {n} 本书的索引")
+            logger.info("📖 已恢复 %d 本书的索引", n)
     except Exception as e:
-        print(f"⚠️ 恢复书籍索引失败: {e}")
+        logger.warning("⚠️ 恢复书籍索引失败: %s", e)
 
     # 代码执行：仅配置开启时暴露给 LLM（模块内已预注册，此处仅日志）
     if settings.mcp_code_enabled:
         from app.mcp.registry import register_code_tool
         register_code_tool()
-        print("🧪 代码执行工具已启用（MCP_CODE_ENABLED=true）")
+        logger.info("🧪 代码执行工具已启用（MCP_CODE_ENABLED=true）")
 
     # 条件注册 Anki 工具（ANKI_ENABLED=true 时）
     if settings.anki_enabled:
         try:
-            from app.mcp.anki import register_anki_tool, AnkiConnectClient
+            from app.mcp.anki import AnkiConnectClient, register_anki_tool
             if AnkiConnectClient().ping():
                 register_anki_tool()
-                print("📇 Anki 工具已注册（AnkiConnect 可用）")
+                logger.info("📇 Anki 工具已注册（AnkiConnect 可用）")
             else:
-                print("⚠️ ANKI_ENABLED=true 但 AnkiConnect 不可用，工具未注册（请检查 Anki 是否运行）")
+                logger.warning("⚠️ ANKI_ENABLED=true 但 AnkiConnect 不可用，工具未注册（请检查 Anki 是否运行）")
         except Exception as e:
-            print(f"⚠️ Anki 工具注册失败: {e}")
+            logger.warning("⚠️ Anki 工具注册失败: %s", e)
 
     # 笔记工具（NOTES_ENABLED，默认开；零依赖本地 markdown）
     if settings.notes_enabled:
         try:
             from app.mcp.notes import register_note_tool
             register_note_tool()
-            print("📝 笔记工具已注册")
+            logger.info("📝 笔记工具已注册")
         except Exception as e:
-            print(f"⚠️ 笔记工具注册失败: {e}")
+            logger.warning("⚠️ 笔记工具注册失败: %s", e)
 
     yield
     # 关闭时：清理资源
-    print("👋 Book Buddy Backend 关闭")
+    logger.info("👋 Book Buddy Backend 关闭")
 
 app = FastAPI(
     title="Book Buddy API",
@@ -64,6 +66,8 @@ app = FastAPI(
 
 from app.config import settings
 from app.middleware.auth import auth_middleware
+
+logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
 
 # CORS 配置（开发环境）
 app.add_middleware(
@@ -92,7 +96,7 @@ async def health():
     }
 
 # 注册路由
-from app.routers import chat, voice, book, config, formula
+from app.routers import book, chat, config, formula, voice
 
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(voice.router, prefix="/api", tags=["voice"])

@@ -1,7 +1,7 @@
 """LLM 服务：通义千问 / DeepSeek 封装"""
 import asyncio
-from typing import Optional, AsyncIterator, List, Any, Union
 from abc import ABC, abstractmethod
+from typing import Any, AsyncIterator, List, Optional, Union
 
 from app.config import settings
 

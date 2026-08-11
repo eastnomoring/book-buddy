@@ -5,10 +5,13 @@
 再用识别结果收窄 RAG 到该章/页附近。
 """
 import json
+import logging
 import re
 from typing import Optional
 
 from app.services.llm import LLMService
+
+logger = logging.getLogger(__name__)
 
 
 # 识别用的 prompt：只要求返回 JSON，不带推理，降低延迟
@@ -88,5 +91,5 @@ async def locate_page(
         return result
 
     except Exception as e:
-        print(f"页码识别失败，降级为整书 RAG: {e}")
+        logger.warning("页码识别失败，降级为整书 RAG: %s", e)
         return {}

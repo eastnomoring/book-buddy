@@ -9,10 +9,10 @@
 最大轮次限制防止 LLM 无限调工具。
 """
 import json
-from typing import Optional, AsyncGenerator
+from typing import AsyncGenerator, Optional
 
+from app.mcp.registry import get_active_openai_tools, registry
 from app.services.llm import LLMService
-from app.mcp.registry import registry, get_active_openai_tools
 
 MAX_TOOL_ROUNDS = 5
 
@@ -40,7 +40,6 @@ async def run_chat_with_tools(
 
     # 当前用户消息（含图）
     if image:
-        from app.services.llm import extract_text_content
         # 多模态消息用 chat_with_tools 时手动构建
         messages.append({
             "role": "user",
@@ -53,7 +52,7 @@ async def run_chat_with_tools(
         messages.append({"role": "user", "content": user_text})
 
     # tool loop
-    for round_num in range(MAX_TOOL_ROUNDS):
+    for _ in range(MAX_TOOL_ROUNDS):
         response = await llm.chat_with_tools(messages, tools)
         message = response.choices[0].message
 
@@ -138,19 +137,17 @@ async def run_chat_with_tools_stream(
     else:
         messages.append({"role": "user", "content": user_text})
 
-    for round_num in range(MAX_TOOL_ROUNDS + 1):
+    for _ in range(MAX_TOOL_ROUNDS + 1):
         stream = await llm.stream_with_tools(messages, tools)
 
         # 累积本轮 assistant 回复
         collected_content = ""
         collected_tool_calls = {}  # index -> {id, name, arguments}
-        finish_reason = None
 
         async for chunk in stream:
             if not chunk.choices:
                 continue
             choice = chunk.choices[0]
-            finish_reason = choice.finish_reason
 
             delta = choice.delta
             if delta is None:

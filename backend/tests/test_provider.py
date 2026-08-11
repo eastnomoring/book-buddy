@@ -2,7 +2,7 @@
 import pytest
 
 from app.config import settings
-from app.services.llm import get_llm_service, LLMService
+from app.services.llm import LLMService, get_llm_service
 
 
 def test_deepseek_provider_raises_clear_error(monkeypatch):

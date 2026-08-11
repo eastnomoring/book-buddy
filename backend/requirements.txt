@@ -1,33 +1,24 @@
 # 后端依赖（里程碑 1 最小集合）
 
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.9
-python-dotenv>=1.0.0
-pydantic-settings>=2.0.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+python-multipart==0.0.32
+python-dotenv==1.2.2
+pydantic-settings==2.14.2
 
 # LLM & 多模态
-dashscope>=1.14.0  # 通义千问 SDK
-openai>=1.0.0  # OpenAI 兼容接口（智谱 GLM / 硅基流动 / Ollama 通用）
-
-# 语音（待定，根据实际 API 调整）
-# 阿里云语音服务 SDK 或 HTTP 调用
+dashscope==1.26.5  # 通义千问 SDK
+openai==2.52.0  # OpenAI 兼容接口（智谱 GLM / 硅基流动 / Ollama 通用）
 
 # RAG & 向量
-chromadb>=0.4.0
+chromadb==1.5.9
 
 # PDF 解析（文本型 PDF；扫描版后续可接 OCR / marker）
-pymupdf>=1.24.0
+pymupdf==1.28.0
 
 # 公式渲染（服务端 matplotlib mathtext → SVG/PNG，供小程序端无 DOM 环境使用）
-matplotlib>=3.8.0
-
-# MCP 代码执行（tool loop，里程碑 2 特性）
-mcp>=2.0.0
-
-# MCP（后续）
-# mcp>=0.1.0
+matplotlib==3.11.1
 
 # 开发工具
-pytest>=8.0.0
-httpx>=0.26.0  # 测试异步接口
+pytest==9.1.1
+httpx==0.28.1  # 生产依赖：anki.py 经 HTTP 调 AnkiConnect；测试也用它打异步接口

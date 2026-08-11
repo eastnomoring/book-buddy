@@ -159,14 +159,14 @@ export class MpChatTransport implements ChatTransport {
           new PlatformError(err.errMsg || 'wx.request failed', err),
         )
       },
-    } as any)
+    })
 
     const decoder = new Utf8StreamDecoder()
     const parser = new SSEParser()
 
     task.onChunkReceived((res) => {
       if (settled || aborted) return
-      const text = decoder.push(res.data as ArrayBuffer)
+      const text = decoder.push(res.data)
       const events = parser.push(text)
       for (const ev of events) {
         if ('error' in ev && ev.error) {
@@ -198,7 +198,7 @@ export class MpChatTransport implements ChatTransport {
         if (aborted || settled) return
         aborted = true
         try {
-          ;(task as unknown as { abort?: () => void }).abort?.()
+          task.abort()
         } catch {
           // ignore
         }

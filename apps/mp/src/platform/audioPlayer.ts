@@ -9,7 +9,7 @@ import { writeFileBase64, removeFile } from './fs'
 const DATA_URI_THRESHOLD = 256 * 1024 // 256KB（base64 字符数）
 
 export class MpAudioPlayer implements AudioPlayer {
-  private ctx: InnerAudioContext | null = null
+  private ctx: WechatMiniprogram.InnerAudioContext | null = null
   private tempFilePath: string | null = null
 
   async play(base64: string, mimeType: string): Promise<void> {

@@ -44,6 +44,7 @@ const text = computed({
     />
     <button
       class="send-btn"
+      :class="{ 'is-disabled': loading || (!modelValue.trim() && !pendingImage) }"
       :disabled="loading || (!modelValue.trim() && !pendingImage)"
       @click="emit('send')"
     >
@@ -99,7 +100,7 @@ const text = computed({
   box-shadow: 0 2px 6px rgba(26, 107, 92, 0.25);
 }
 
-.send-btn[disabled] {
+.send-btn.is-disabled {
   opacity: 0.45;
 }
 </style>

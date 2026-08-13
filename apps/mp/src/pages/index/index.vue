@@ -290,6 +290,7 @@ function playLastAnswer() {
     />
 
     <MessageList
+      class="message-list"
       :messages="messages"
       :loading="loading"
       :error="error"
@@ -334,6 +335,15 @@ function playLastAnswer() {
   height: 100vh;
   background: linear-gradient(165deg, #f4f7f8 0%, #eef2f4 42%, #e2e8ec 100%);
   color: #152028;
+}
+
+/* 小程序自定义组件宿主节点高度自适应内容，flex:1 写在 MessageList 内部不生效，
+   需在父级把宿主节点撑开，输入栏才能被顶到底部 */
+.message-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .pending-image {

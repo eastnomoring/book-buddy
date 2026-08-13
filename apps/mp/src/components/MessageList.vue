@@ -46,9 +46,9 @@ const lastMessageId = computed(() => {
       <view class="bubble-inner">
         <text class="bubble-label">伴读</text>
         <view class="typing">
-          <text></text>
-          <text></text>
-          <text></text>
+          <text class="dot"></text>
+          <text class="dot"></text>
+          <text class="dot"></text>
         </view>
       </view>
     </view>
@@ -113,7 +113,7 @@ const lastMessageId = computed(() => {
   border-bottom-left-radius: 4px;
 }
 
-.typing text {
+.typing .dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -121,11 +121,11 @@ const lastMessageId = computed(() => {
   animation: typing-dot 1.2s ease-in-out infinite;
 }
 
-.typing text:nth-child(2) {
+.typing .dot:nth-child(2) {
   animation-delay: 0.15s;
 }
 
-.typing text:nth-child(3) {
+.typing .dot:nth-child(3) {
   animation-delay: 0.3s;
 }
 

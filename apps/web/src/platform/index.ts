@@ -19,6 +19,7 @@ import {
   type SSEAudioEvent,
 } from '@book-buddy/core'
 import { synthesizeVoice, transcribeVoice } from '../api/client'
+import { getAuthToken } from '../utils/auth'
 
 /** 工具事件（tool_call / tool_result）。T1 协议：文本增量不带 type，工具事件带 type */
 export type ToolEvent = SSEToolCallEvent | SSEToolResultEvent
@@ -52,9 +53,13 @@ class WebChatTransportImpl {
 
     const run = async () => {
       try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        const token = getAuthToken()
+        if (token) headers.Authorization = `Bearer ${token}`
+
         const response = await fetch(API_BASE + API_PATHS.CHAT_STREAM, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(buildChatBody(req)),
           signal: controller.signal,
         })
@@ -207,13 +212,11 @@ class WebAudioPlayerImpl {
 
   async play(base64: string, mimeType: string): Promise<void> {
     this.stop()
-    return new Promise((resolve) => {
-      const audio = new Audio(`data:${mimeType};base64,${base64}`)
-      this.current = audio
-      audio.onended = () => resolve()
-      audio.onerror = () => resolve()
-      audio.play().catch(() => resolve())
-    })
+    const audio = new Audio(`data:${mimeType};base64,${base64}`)
+    this.current = audio
+    // iOS 微信等自动播放被拦时，等用户点按补播（见 utils/audioPlayback.ts）
+    const { playAudioElement } = await import('../utils/audioPlayback')
+    await playAudioElement(audio)
   }
 
   stop(): void {

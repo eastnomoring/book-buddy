@@ -299,4 +299,11 @@ onUnmounted(() => {
   color: var(--error);
   font-size: 0.86rem;
 }
+
+@media (max-width: 900px) {
+  .chat {
+    min-height: 65vh;
+    padding: 0.85rem 0.85rem 0.75rem;
+  }
+}
 </style>

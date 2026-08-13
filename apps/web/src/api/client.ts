@@ -1,5 +1,6 @@
 // API 客户端（Web 传输层）
 import axios from 'axios'
+import { getAuthToken } from '../utils/auth'
 import {
   API_PATHS,
   buildChatBody,
@@ -35,6 +36,13 @@ export type {
 const api = axios.create({
   baseURL: '/api',
   timeout: 60000,
+})
+
+// 访问口令：后端 AUTH_TOKEN 开启时，所有请求带 Bearer token
+api.interceptors.request.use((config) => {
+  const token = getAuthToken()
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
 })
 
 // 对话

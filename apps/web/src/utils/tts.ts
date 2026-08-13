@@ -9,6 +9,7 @@
  */
 import { synthesizeVoice } from '../api/client'
 import { spokenText } from '@book-buddy/core'
+import { playAudioElement } from './audioPlayback'
 
 /**
  * 朗读队列。useServer=true 时逐句调后端 TTS（音频 mp3 base64）顺序播放；
@@ -74,12 +75,9 @@ export class TTSPlayer {
   }
 
   private playAudio(base64: string): Promise<void> {
-    return new Promise((resolve) => {
-      const audio = new Audio(`data:audio/mpeg;base64,${base64}`)
-      this.currentAudio = audio
-      audio.onended = () => resolve()
-      audio.onerror = () => resolve()
-      audio.play().catch(() => resolve()) // 自动播放被拦等原因，跳过不阻塞队列
-    })
+    const audio = new Audio(`data:audio/mpeg;base64,${base64}`)
+    this.currentAudio = audio
+    // iOS 微信等自动播放被拦时，等用户点按补播（见 audioPlayback.ts）
+    return playAudioElement(audio)
   }
 }

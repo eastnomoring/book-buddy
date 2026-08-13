@@ -315,4 +315,12 @@ onUnmounted(() => {
   color: var(--error);
   font-size: 0.86rem;
 }
+
+@media (max-width: 900px) {
+  /* 手机上拍照区在对话区上方，压扁预览高度避免首屏被占满 */
+  .viewport {
+    min-height: 200px;
+    aspect-ratio: 4 / 3;
+  }
+}
 </style>

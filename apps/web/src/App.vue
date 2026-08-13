@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import ChatInterface from './components/ChatInterface.vue'
 import CameraCapture from './components/CameraCapture.vue'
 import BookSelector from './components/BookSelector.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import AccessGate from './components/AccessGate.vue'
+import { getConfig } from './api/client'
+import { isUnauthorized } from './utils/auth'
 
 const currentBookId = ref<string | null>(null)
 const currentPage = ref<number>(1)
 const capturedImage = ref<string | null>(null)
+const needsAuth = ref(false)
+
+onMounted(async () => {
+  // 探测后端是否开启 AUTH_TOKEN：401 则弹口令窗；未开启则任何请求都能过
+  try {
+    await getConfig()
+  } catch (e) {
+    if (isUnauthorized(e)) needsAuth.value = true
+  }
+})
+
+function onUnlocked() {
+  // 各模块挂载时的请求都没带 token，直接刷新让全部状态干净重建
+  location.reload()
+}
 
 function onBookSelected(bookId: string) {
   currentBookId.value = bookId
@@ -23,6 +41,7 @@ function onImageCaptured(imageBase64: string) {
 </script>
 
 <template>
+  <AccessGate v-if="needsAuth" @unlocked="onUnlocked" />
   <div class="app">
     <header class="masthead">
       <div class="brand-block">
@@ -167,6 +186,31 @@ function onImageCaptured(imageBase64: string) {
   .stage {
     grid-template-columns: 1fr;
     min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .app {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .masthead {
+    margin: -1rem -0.75rem 1rem;
+    padding: 0.85rem 0.75rem 0.9rem;
+    gap: 0.75rem;
+  }
+
+  /* 手机竖屏空间紧张，副标题让位给操作区 */
+  .brand-line {
+    display: none;
+  }
+
+  .masthead-actions {
+    justify-content: space-between;
+  }
+
+  .stage {
+    gap: 0.75rem;
   }
 }
 </style>

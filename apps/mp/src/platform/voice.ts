@@ -5,10 +5,8 @@
  */
 import {
   API_PATHS,
-  mapTestResult,
   PlatformError,
   type VoiceTranscribeResponse,
-  type ConfigTestResult,
 } from '@book-buddy/core'
 import { getApiBase } from './config'
 
@@ -52,36 +50,6 @@ export function synthesizeVoice(text: string, voice?: string): Promise<string> {
         resolve(data.audio)
       },
       fail: (err) => reject(new PlatformError(err.errMsg || 'synthesize failed', err)),
-    })
-  })
-}
-
-export function testConfigConnection(payload: {
-  provider: string
-  apiKey?: string
-  baseUrl?: string
-  model?: string
-}): Promise<ConfigTestResult> {
-  return new Promise((resolve, reject) => {
-    uni.request({
-      url: getApiBase() + API_PATHS.CONFIG_TEST,
-      method: 'POST',
-      header: { 'Content-Type': 'application/json' },
-      data: {
-        provider: payload.provider,
-        api_key: payload.apiKey || undefined,
-        base_url: payload.baseUrl || undefined,
-        model: payload.model || undefined,
-      },
-      success: (res) => {
-        const status = res.statusCode ?? 0
-        if (status < 200 || status >= 300) {
-          reject(new PlatformError(`HTTP ${status}`))
-          return
-        }
-        resolve(mapTestResult(res.data as Record<string, unknown>))
-      },
-      fail: (err) => reject(new PlatformError(err.errMsg || 'test config failed', err)),
     })
   })
 }

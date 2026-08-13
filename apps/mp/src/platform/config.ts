@@ -21,7 +21,15 @@ export function setApiBase(base: string): void {
 }
 
 
-import { API_PATHS, mapConfig, PlatformError, type AppConfig } from '@book-buddy/core'
+import {
+  API_PATHS,
+  mapConfig,
+  mapTestResult,
+  PlatformError,
+  type AppConfig,
+  type ConfigTestResult,
+  type ConfigUpdatePayload,
+} from '@book-buddy/core'
 
 export function getConfig(): Promise<AppConfig> {
   return new Promise((resolve, reject) => {
@@ -37,6 +45,57 @@ export function getConfig(): Promise<AppConfig> {
         resolve(mapConfig(res.data as Record<string, unknown>))
       },
       fail: (err) => reject(new PlatformError(err.errMsg || 'get config failed', err)),
+    })
+  })
+}
+
+export function updateConfig(payload: ConfigUpdatePayload): Promise<AppConfig> {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: getApiBase() + API_PATHS.CONFIG,
+      method: 'PUT',
+      header: { 'Content-Type': 'application/json' },
+      data: {
+        provider: payload.provider,
+        api_key: payload.apiKey || undefined,
+        base_url: payload.baseUrl || undefined,
+        model: payload.model || undefined,
+        voice_api_key: payload.voiceApiKey || undefined,
+      },
+      success: (res) => {
+        const status = res.statusCode ?? 0
+        if (status < 200 || status >= 300) {
+          reject(new PlatformError(`HTTP ${status}`))
+          return
+        }
+        resolve(mapConfig(res.data as Record<string, unknown>))
+      },
+      fail: (err) => reject(new PlatformError(err.errMsg || 'update config failed', err)),
+    })
+  })
+}
+
+export function testConfigConnection(payload: ConfigUpdatePayload): Promise<ConfigTestResult> {
+  return new Promise((resolve, reject) => {
+    uni.request({
+      url: getApiBase() + API_PATHS.CONFIG_TEST,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: {
+        provider: payload.provider,
+        api_key: payload.apiKey || undefined,
+        base_url: payload.baseUrl || undefined,
+        model: payload.model || undefined,
+      },
+      success: (res) => {
+        const status = res.statusCode ?? 0
+        if (status < 200 || status >= 300) {
+          reject(new PlatformError(`HTTP ${status}`))
+          return
+        }
+        resolve(mapTestResult(res.data as Record<string, unknown>))
+      },
+      fail: (err) => reject(new PlatformError(err.errMsg || 'test config failed', err)),
     })
   })
 }
